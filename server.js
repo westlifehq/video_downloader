@@ -3,6 +3,8 @@ const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 const douyin = require('./lib/douyin');
+const xhs = require('./lib/xhs');
+
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -103,17 +105,27 @@ app.post('/api/parse', async (req, res) => {
     try {
         console.log(`[解析] 输入链接: ${url}`);
 
-        // 1. 解析短链接
-        const realUrl = await douyin.resolveShareUrl(url);
-        console.log(`[解析] 真实链接: ${realUrl}`);
+        // 1. 根据域名判断平台
+        let info;
+        if (url.includes('xhslink.com') || url.includes('xiaohongshu.com')) {
+            console.log(`[解析] 检测到小红书链接`);
+            info = await xhs.fetchXhsInfo(url);
+        } else {
+            console.log(`[解析] 检测到抖音链接`);
+            // 1. 解析短链接
+            const realUrl = await douyin.resolveShareUrl(url);
+            console.log(`[解析] 真实链接: ${realUrl}`);
 
-        // 2. 提取 video ID
-        const videoId = douyin.extractVideoId(realUrl);
-        console.log(`[解析] 视频 ID: ${videoId}`);
+            // 2. 提取 video ID
+            const videoId = douyin.extractVideoId(realUrl);
+            console.log(`[解析] 视频 ID: ${videoId}`);
 
-        // 3. 获取视频详情 (包含无水印 URL 等所有信息)
-        const info = await douyin.fetchVideoInfo(videoId);
-        console.log(`[解析] 成功! 标题: ${info.title}, URL: ${info.videoUrl}`);
+            // 3. 获取视频详情
+            info = await douyin.fetchVideoInfo(videoId);
+        }
+        
+        console.log(`[解析] 成功! 标题: ${info.title}, 类型: ${info.type}`);
+
 
         res.json({
             success: true,
@@ -130,13 +142,20 @@ app.post('/api/parse', async (req, res) => {
  */
 app.post('/api/download', async (req, res) => {
     const { videoUrl, title, awemeId, type, images } = req.body;
+    let { platform } = req.body;
     const isImage = type === 'image';
 
-    if (isImage && (!images || images.length === 0)) {
-        return res.status(400).json({ error: '缺少图片数据' });
-    } else if (!isImage && !videoUrl) {
-        return res.status(400).json({ error: '缺少视频 URL' });
+
+    // 自动补全 platform，防止前端缓存了旧版 app.js 没传 platform 参数
+    if (!platform && videoUrl) {
+        if (videoUrl.includes('xhscdn.com') || videoUrl.includes('xiaohongshu.com')) {
+            platform = 'xhs';
+        }
     }
+
+    console.log(`[下载] 收到请求: ${title}, 平台: ${platform || '未知'}, 类型: ${type}`);
+    console.log(`[下载] URL: ${videoUrl || (images ? images[0] : '无')}`);
+
 
     const config = readConfig();
     let downloadDir = config.downloadDir;
@@ -174,7 +193,10 @@ app.post('/api/download', async (req, res) => {
 
     // 后台下载
     try {
+        const referer = platform === 'xhs' ? 'https://www.xiaohongshu.com/' : 'https://www.douyin.com/';
+        console.log(`[下载] 最终使用 Referer: ${referer}`);
         let result;
+
         if (isImage) {
             result = await douyin.downloadImages(images, savePath, (progress, downloaded, total) => {
                 const task = downloadTasks.get(taskId);
@@ -183,7 +205,7 @@ app.post('/api/download', async (req, res) => {
                     task.downloaded = downloaded;
                     task.total = total;
                 }
-            });
+            }, referer);
         } else {
             result = await douyin.downloadVideo(videoUrl, savePath, (progress, downloaded, total) => {
                 const task = downloadTasks.get(taskId);
@@ -192,7 +214,7 @@ app.post('/api/download', async (req, res) => {
                     task.downloaded = downloaded;
                     task.total = total;
                 }
-            });
+            }, referer);
         }
 
         const task = downloadTasks.get(taskId);

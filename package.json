@@ -1,6 +1,6 @@
 {
   "name": "douyin-downloader",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "抖音视频无水印下载器",
   "main": "server.js",
   "scripts": {

@@ -108,7 +108,7 @@ async function handleParse() {
 
     const container = document.getElementById('resultsContainer');
     container.innerHTML = '';
-    
+
     // 取消所有进行中的轮询
     Object.values(appState.pollTimers).forEach(clearInterval);
     appState.items = {};
@@ -199,7 +199,7 @@ function updateCard(id) {
     if (item.status === 'downloading' || item.taskId || item.status === 'done' || item.status === 'error') {
         const pLabel = item.status === 'done' ? '✓ 下载完成' : (item.status === 'error' ? '✕ 下载失败' : '下载中…');
         const pNum = item.progress || 0;
-        
+
         let pDetail = '';
         if (item.status === 'done' && item.fileSize) {
             pDetail = `${item.fileName} (${formatBytes(item.fileSize)})`;
@@ -212,7 +212,7 @@ function updateCard(id) {
         progressHtml = `
           <div class="download-progress" style="margin-top: 16px;">
             <div class="progress-header">
-              <span class="progress-label" style="color: ${item.status==='error'?'var(--c-error)':(item.status==='done'?'var(--c-success)':'')}">${pLabel}</span>
+              <span class="progress-label" style="color: ${item.status === 'error' ? 'var(--c-error)' : (item.status === 'done' ? 'var(--c-success)' : '')}">${pLabel}</span>
               <span class="progress-percent">${pNum}%</span>
             </div>
             <div class="progress-bar">
@@ -292,7 +292,7 @@ function startPolling(id) {
             item.progress = task.progress || 0;
             item.downloaded = task.downloaded || 0;
             item.total = task.total || 0;
-            
+
             if (task.status === 'done') {
                 clearInterval(appState.pollTimers[id]);
                 item.status = 'done';
