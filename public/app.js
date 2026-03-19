@@ -369,6 +369,7 @@ function addToHistory(item) {
         fileName: item.fileName,
         filePath: item.filePath,
         fileSize: item.fileSize,
+        cover: item.info ? item.info.cover : '',
         time: Date.now(),
     });
     history = history.slice(0, 50);
@@ -387,14 +388,19 @@ function loadHistory() {
 
     section.style.display = 'block';
     list.innerHTML = history.map((item, index) => {
+        const thumbHtml = item.cover
+            ? `<img class="history-thumb" src="${item.cover}" alt="" onerror="this.outerHTML='<div class=\\&quot;history-thumb-placeholder\\&quot;><svg viewBox=\\&quot;0 0 24 24\\&quot; fill=\\&quot;none\\&quot; stroke=\\&quot;currentColor\\&quot; stroke-width=\\&quot;2\\&quot;><polygon points=\\&quot;5 3 19 12 5 21 5 3\\&quot;></polygon></svg></div>'">`
+            : `<div class="history-thumb-placeholder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg></div>`;
         return `
       <div class="history-item">
-        <svg class="history-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-          <polyline points="22 4 12 14.01 9 11.01"/>
-        </svg>
-        <span class="history-name" title="${item.filePath || ''}">${item.title || item.fileName}</span>
-        <span class="history-size">${formatBytes(item.fileSize)}</span>
+        ${thumbHtml}
+        <div class="history-info">
+          <span class="history-name" title="${item.filePath || ''}">${item.title || item.fileName}</span>
+          <div class="history-meta">
+            <span class="history-status"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>Completed</span>
+            <span class="history-size">${formatBytes(item.fileSize)}</span>
+          </div>
+        </div>
         <div class="history-actions">
           <button class="action-btn action-btn--open" onclick="openHistoryFile('${(item.filePath || '').replace(/\\/g, '\\\\')}')" title="在文件夹中显示">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
