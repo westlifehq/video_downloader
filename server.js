@@ -276,14 +276,14 @@ app.post('/api/history/open', (req, res) => {
     let command;
 
     if (platform === 'win32') {
-        // Windows: 使用 start "" "path" 以防路径包含并列双引号
-        command = `start "" "${filePath}"`;
+        // Windows: 使用 explorer /select, "path" 打开文件夹并选中文件
+        command = `explorer.exe /select,"${filePath}"`;
     } else if (platform === 'darwin') {
-        // macOS: 使用 open
-        command = `open "${filePath}"`;
+        // macOS: 使用 open -R 打开文件夹并选中文件
+        command = `open -R "${filePath}"`;
     } else {
-        // Linux: 使用 xdg-open
-        command = `xdg-open "${filePath}"`;
+        // Linux: 使用 xdg-open 打开父目录
+        command = `xdg-open "${path.dirname(filePath)}"`;
     }
 
     exec(command, (err) => {

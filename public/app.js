@@ -396,7 +396,7 @@ function loadHistory() {
         <span class="history-name" title="${item.filePath || ''}">${item.title || item.fileName}</span>
         <span class="history-size">${formatBytes(item.fileSize)}</span>
         <div class="history-actions">
-          <button class="action-btn action-btn--open" onclick="openHistoryFile('${(item.filePath || '').replace(/\\/g, '\\\\')}')" title="打开文件所在位置或播放">
+          <button class="action-btn action-btn--open" onclick="openHistoryFile('${(item.filePath || '').replace(/\\/g, '\\\\')}')" title="在文件夹中显示">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
             </svg>
