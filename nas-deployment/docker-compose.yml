@@ -1,0 +1,12 @@
+services:
+  downloader:
+    build: .
+    container_name: video-downloader
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - /vol2/1000/dy:/downloads
+    environment:
+      - NODE_ENV=production
+      - DOWNLOAD_DIR=/downloads

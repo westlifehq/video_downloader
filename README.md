@@ -71,6 +71,21 @@ npm run build:exe
 
 ---
 
+## 🐳 NAS/Docker 远程部署专用版
+
+对于希望在群晖、飞牛 OS 等 NAS 设备或 Linux 服务器上长期运行本工具的用户，本项目提供了一个专门适配远程运行的隔离版本压缩在 `nas-deployment/` 目录中。
+
+**主要特性：**
+* 完整移除本地相关依赖，专门针对 Docker 优化（默认绑定 `0.0.0.0`，无 TTY 崩溃问题）
+* 自带 `Dockerfile` 与 `docker-compose.yml`，支持一键构建与启动
+* 新增通过环境变量 `DOWNLOAD_DIR` 灵活映射物理下载路径
+* 前端 UI 专门对移动端浏览器（如 Safari、夸克、UC 等）增加了 **「保存到手机」** 的 HTTP 直接下载适配，自动处理文件名中文乱码与特殊浏览器格式限制问题。
+
+**使用方法：**
+进入 `nas-deployment` 目录，通过 `docker build` 或 `docker-compose up -d` 即可部署。该目录不会影响根目录的本地 PC 版使用体验。
+
+---
+
 ## ⚙ 技术栈
 
 * **后端**：`Node.js`, `Express`, `Axios`
