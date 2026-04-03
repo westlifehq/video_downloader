@@ -389,9 +389,10 @@ function loadHistory() {
 
     section.style.display = 'block';
     list.innerHTML = history.map((item, index) => {
+        const placeholderHtml = `<div class="history-thumb-placeholder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg></div>`;
         const thumbHtml = item.cover
-            ? `<img class="history-thumb" src="${item.cover}" alt="" onerror="this.outerHTML='<div class=\\\\"history-thumb-placeholder\\\\"><svg viewBox=\\\\"0 0 24 24\\\\" fill=\\\\"none\\\\" stroke=\\\\"currentColor\\\\" stroke-width=\\\\"2\\\\"><polygon points=\\\\"5 3 19 12 5 21 5 3\\\\"></polygon></svg></div>'">`
-            : `<div class="history-thumb-placeholder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg></div>`;
+            ? `<img class="history-thumb" src="${item.cover}" alt="" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">` + `<div class="history-thumb-placeholder" style="display:none;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg></div>`
+            : placeholderHtml;
         return `
       <div class="history-item">
         ${thumbHtml}
@@ -502,6 +503,18 @@ let favIsLoggedIn = false;
 let favLoginPollTimer = null;
 let favSyncedItems = [];
 let favDownloadStates = {};
+let isFavMultiSelectMode = false;
+let favSelectedItems = new Set();
+
+async function stopFavSync(taskId) {
+    if(!confirm('确定要打断当前同步并结算已抓取的数据吗？')) return;
+    try {
+        await api('POST', '/api/favorites/sync/stop', { taskId });
+        showToast('已发送打断信号，请稍候...', 'info');
+    } catch (err) {
+        showToast('打断失败: ' + err.message, 'error');
+    }
+}
 
 /**
  * 加载收藏同步状态
@@ -656,8 +669,11 @@ function pollFavSync(taskId) {
             if (task.status === 'fetching') {
                 panel.innerHTML = `
                     <div class="fav-sync-header">
-                        <span class="fav-sync-phase">${task.phase || '正在获取收藏列表...'}</span>
-                        <span class="fav-sync-counter">已发现 ${task.collected || 0} 条</span>
+                        <div>
+                            <span class="fav-sync-phase">${task.phase || '正在获取收藏列表...'}</span>
+                            <span class="fav-sync-counter" style="margin-left:8px">已发现 ${task.collected || 0} 条</span>
+                        </div>
+                        <button class="btn btn--stop" style="padding:4px 10px;font-size:11px;border-radius:6px;color:white;border:none;cursor:pointer;" onclick="stopFavSync('${taskId}')">停止打断</button>
                     </div>
                     <div class="fav-sync-progress">
                         <div class="fav-sync-progress-fill indeterminate" style="width:30%"></div>
@@ -723,16 +739,32 @@ function renderFavList() {
 
     let html = '';
 
+    // 处理多选模式头部
+    if (isFavMultiSelectMode) {
+        html += `<div class="multi-select-bar">
+            <span style="font-size:13px;font-weight:600;color:var(--c-primary)">已选 ${favSelectedItems.size} 项</span>
+            <div class="multi-select-actions">
+                <button class="btn btn--secondary" style="padding:5px 10px;font-size:12px;border-radius:6px" onclick="favSelectAllUndownloaded()">全选未下载</button>
+                <button class="btn btn--secondary" style="padding:5px 10px;font-size:12px;border-radius:6px" onclick="toggleFavMultiSelectMode()">取消</button>
+                <button class="btn btn--sync" style="padding:5px 12px;font-size:12px;border-radius:6px" onclick="downloadSelectedFavItems()" ${favSelectedItems.size === 0 ? 'disabled' : ''}>下载所选</button>
+            </div>
+        </div>`;
+    }
+
     // 未下载区域
-    html += `<div class="fav-group">
+    html += `<div class="fav-group" style="${isFavMultiSelectMode ? 'opacity:0.9' : ''}">
         <div class="fav-sync-header" style="margin-bottom:10px">
             <span class="fav-sync-phase">📥 未下载 (${undownloaded.length})</span>
-            ${undownloaded.length > 0 ? `<button class="btn btn--sync" onclick="downloadAllFavItems()" style="padding:5px 12px;font-size:12px">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-                </svg>
-                <span>全部下载</span>
-            </button>` : ''}
+            ${(!isFavMultiSelectMode && favSyncedItems.length > 0) ? `
+            <div style="display:flex;gap:8px;">
+                <button class="btn btn--secondary" onclick="toggleFavMultiSelectMode()" style="padding:5px 12px;font-size:12px;border-radius:6px">多选</button>
+                ${undownloaded.length > 0 ? `<button class="btn btn--sync" onclick="downloadAllFavItems()" style="padding:5px 12px;font-size:12px;border-radius:6px">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    <span>全部下载</span>
+                </button>` : ''}
+            </div>` : ''}
         </div>`;
 
     if (undownloaded.length === 0) {
@@ -836,7 +868,20 @@ function renderFavItemCard(item, isDownloadedSection) {
 
     const authorHtml = item.author ? `<span style="font-size:11px;color:var(--c-text-muted)">@${item.author}</span>` : '';
 
-    return `<div class="fav-sync-item" style="padding:10px 12px;gap:10px">
+    const isSelected = favSelectedItems.has(idx);
+    const checkboxHtml = isFavMultiSelectMode ? `
+        <div class="fav-checkbox-wrap">
+            <input type="checkbox" class="fav-checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); toggleFavItemSelection(${idx})" />
+        </div>
+    ` : '';
+    
+    // 多选模式下隐藏操作按钮
+    if (isFavMultiSelectMode) {
+        actionHtml = '';
+    }
+
+    return `<div class="fav-sync-item ${isSelected ? 'selected' : ''}" style="padding:10px 12px;gap:10px;${isFavMultiSelectMode ? 'cursor:pointer;' : ''}" ${isFavMultiSelectMode ? `onclick="toggleFavItemSelection(${idx})"` : ''}>
+        ${checkboxHtml}
         ${coverHtml}
         <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
             <span class="fav-sync-item-title" title="${item.title}">${item.title}</span>
@@ -967,5 +1012,50 @@ async function downloadAllFavItems() {
         const ds = favDownloadStates[item.awemeId];
         if (ds && (ds.status === 'downloading' || ds.status === 'done')) continue;
         await downloadFavItem(i);
+    }
+}
+
+// ── 多选下载逻辑 ──
+function toggleFavMultiSelectMode() {
+    isFavMultiSelectMode = !isFavMultiSelectMode;
+    if (!isFavMultiSelectMode) {
+        favSelectedItems.clear();
+    }
+    renderFavList();
+}
+
+function toggleFavItemSelection(idx) {
+    if (!isFavMultiSelectMode) return;
+    if (favSelectedItems.has(idx)) {
+        favSelectedItems.delete(idx);
+    } else {
+        favSelectedItems.add(idx);
+    }
+    renderFavList();
+}
+
+function favSelectAllUndownloaded() {
+    favSyncedItems.forEach((item, idx) => {
+        const dState = favDownloadStates[item.awemeId];
+        const isDone = item.alreadyDownloaded || (dState && dState.status === 'done');
+        if (!isDone && !item.parseError) {
+            favSelectedItems.add(idx);
+        }
+    });
+    renderFavList();
+}
+
+async function downloadSelectedFavItems() {
+    if (favSelectedItems.size === 0) return;
+    const targets = Array.from(favSelectedItems);
+    toggleFavMultiSelectMode(); // 退出多选模式，开始依次下载
+    
+    for (const idx of targets) {
+        const item = favSyncedItems[idx];
+        if (!item || item.parseError) continue;
+        const ds = favDownloadStates[item.awemeId];
+        // 如果正在下或已下完，则跳过
+        if (ds && (ds.status === 'downloading' || ds.status === 'done')) continue;
+        await downloadFavItem(idx);
     }
 }

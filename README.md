@@ -3,13 +3,14 @@
 > 🚀 一个基于 Node.js 构建的现代化、极简、高颜值的全平台视频内容解析及下载工具。
 
 ![UI Preview](https://img.shields.io/badge/Status-Active-success)
-![Version](https://img.shields.io/badge/Version-1.1.0-blue)
+![Version](https://img.shields.io/badge/Version-1.2.0-blue)
 ![Nodejs](https://img.shields.io/badge/Node.js-18.x-blue)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 
 ## 🌟 核心特性
 
-- **抖音收藏夹同步**：支持扫码登录后，自动同步最近 50 条收藏视频，支持手动选下、批量下载、已下载自动标识及文件删除。
+- **高级收藏夹同步 (v2.1)**：支持扫码登录后自动同步收藏视频。新增 **「同步打断」** 机制（加载过慢时可随时结算并停止滚动）以及 **「多选批量下载」** 模式（支持一键勾选未下载视频进行并发下载）。
+- **物理文件双向同步**：支持在下载历史和收藏面板直接「打开文件位置」或「从磁盘物理删除」，实现下载状态与本地文件的实时对齐。
 - **跨平台解析**：支持 **抖音 (Douyin)** 和 **小红书 (Xiaohongshu)** 视频内容解析，自动识别平台并切换引擎。
 - **无水印原画质**：直取底层接口，下载官方无压缩、无水印的 1080P/720P 原视频。
 - **自动短链追踪**：支持分享短链接，自动识别并跟随 302 重定向。

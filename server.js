@@ -401,6 +401,7 @@ app.post('/api/favorites/sync', async (req, res) => {
         items: [],
         error: null,
         startTime: Date.now(),
+        interrupted: false,
     };
     favSyncTasks.set(taskId, task);
 
@@ -411,7 +412,7 @@ app.post('/api/favorites/sync', async (req, res) => {
             task.collected = collected;
             task.maxCount = max;
             task.current = current;
-        });
+        }, () => task.interrupted);
 
         if (rawItems.length === 0) {
             task.status = 'done';
@@ -464,7 +465,7 @@ app.post('/api/favorites/sync', async (req, res) => {
         }
 
         task.status = 'done';
-        task.phase = `已获取 ${task.items.length} 条收藏`;
+        task.phase = task.interrupted ? `已打断，获取到 ${task.items.length} 条收藏` : `已获取 ${task.items.length} 条收藏`;
         console.log(`[收藏同步] ${task.phase}`);
     } catch (err) {
         task.status = 'error';
@@ -472,6 +473,27 @@ app.post('/api/favorites/sync', async (req, res) => {
         task.phase = '获取收藏列表失败';
         console.error(`[收藏同步] 错误: ${err.message}`);
     }
+});
+
+/**
+ * POST /api/favorites/sync/stop — 打断同步任务
+ */
+app.post('/api/favorites/sync/stop', (req, res) => {
+    const { taskId } = req.body;
+    if (!taskId) return res.status(400).json({ error: '未提供 taskId' });
+    
+    const task = favSyncTasks.get(taskId);
+    if (!task) {
+        return res.status(404).json({ error: '任务不存在' });
+    }
+    
+    if (task.status === 'fetching') {
+        task.interrupted = true;
+        console.log(`[收藏同步] 接收到打断信号 taskId=${taskId}`);
+        return res.json({ success: true, message: '打断信号已发送' });
+    }
+    
+    res.json({ success: false, message: '任务不在获取阶段，无法打断' });
 });
 
 /**
