@@ -12,6 +12,7 @@ let appState = {
 document.addEventListener('DOMContentLoaded', () => {
     loadConfig();
     loadHistory();
+    loadFavStatus();
 
     document.getElementById('urlInput').addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -389,7 +390,7 @@ function loadHistory() {
     section.style.display = 'block';
     list.innerHTML = history.map((item, index) => {
         const thumbHtml = item.cover
-            ? `<img class="history-thumb" src="${item.cover}" alt="" onerror="this.outerHTML='<div class=\\&quot;history-thumb-placeholder\\&quot;><svg viewBox=\\&quot;0 0 24 24\\&quot; fill=\\&quot;none\\&quot; stroke=\\&quot;currentColor\\&quot; stroke-width=\\&quot;2\\&quot;><polygon points=\\&quot;5 3 19 12 5 21 5 3\\&quot;></polygon></svg></div>'">`
+            ? `<img class="history-thumb" src="${item.cover}" alt="" onerror="this.outerHTML='<div class=\\\\"history-thumb-placeholder\\\\"><svg viewBox=\\\\"0 0 24 24\\\\" fill=\\\\"none\\\\" stroke=\\\\"currentColor\\\\" stroke-width=\\\\"2\\\\"><polygon points=\\\\"5 3 19 12 5 21 5 3\\\\"></polygon></svg></div>'">`
             : `<div class="history-thumb-placeholder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg></div>`;
         return `
       <div class="history-item">
@@ -445,7 +446,6 @@ async function deleteHistoryFile(filePath, index) {
             showToast('删除失败: ' + err.message, 'error');
         }
     } finally {
-        // 无论物理删除是否成功（只要接口跑了），都从历史记录中清理
         let history = JSON.parse(localStorage.getItem('dy_history') || '[]');
         history.splice(index, 1);
         localStorage.setItem('dy_history', JSON.stringify(history));
@@ -491,4 +491,481 @@ function showToast(msg, type = 'info') {
         toast.classList.remove('show');
         setTimeout(() => toast.remove(), 300);
     }, 3000);
+}
+
+// ═══════════════════════════════════════════
+// 收藏同步
+// ═══════════════════════════════════════════
+
+let favSyncPollTimer = null;
+let favIsLoggedIn = false;
+let favLoginPollTimer = null;
+let favSyncedItems = [];
+let favDownloadStates = {};
+
+/**
+ * 加载收藏同步状态
+ */
+async function loadFavStatus() {
+    try {
+        const status = await api('GET', '/api/favorites/status');
+        favIsLoggedIn = status.loggedIn;
+        updateFavUI(status);
+    } catch (err) {
+        console.error('加载收藏状态失败:', err);
+    }
+}
+
+function updateFavUI(status) {
+    const badge = document.getElementById('favAccountBadge');
+    const accountBtn = document.getElementById('favAccountBtn');
+    const accountBtnText = document.getElementById('favAccountBtnText');
+    const syncBtn = document.getElementById('favSyncBtn');
+
+    if (status.loggedIn) {
+        badge.style.display = 'inline-flex';
+        document.getElementById('favAccountText').textContent =
+            status.lastSyncTime ? `上次同步 ${formatSyncTime(status.lastSyncTime)}` : '已登录';
+        accountBtn.className = 'btn btn--account logged-in';
+        accountBtnText.textContent = '切换账号';
+        syncBtn.disabled = false;
+    } else {
+        badge.style.display = 'none';
+        accountBtn.className = 'btn btn--account';
+        accountBtnText.textContent = '登录';
+        syncBtn.disabled = true;
+    }
+}
+
+function formatSyncTime(isoStr) {
+    try {
+        const d = new Date(isoStr);
+        const now = new Date();
+        const diff = now - d;
+        if (diff < 60000) return '刚刚';
+        if (diff < 3600000) return `${Math.floor(diff / 60000)} 分钟前`;
+        if (diff < 86400000) return `${Math.floor(diff / 3600000)} 小时前`;
+        return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${d.getMinutes().toString().padStart(2, '0')}`;
+    } catch {
+        return '';
+    }
+}
+
+/**
+ * 账号按钮：登录 / 切换账号（退出后重新登录）
+ */
+async function handleFavAccount() {
+    if (favIsLoggedIn) {
+        if (!confirm('退出当前抖音账号？退出后可重新扫码登录其他账号。')) return;
+        try {
+            await api('POST', '/api/favorites/logout');
+            showToast('已退出登录', 'success');
+            favIsLoggedIn = false;
+            updateFavUI({ loggedIn: false });
+            document.getElementById('favSyncPanel').style.display = 'none';
+            favSyncedItems = [];
+        } catch (err) {
+            showToast('退出失败: ' + err.message, 'error');
+        }
+    } else {
+        try {
+            await api('POST', '/api/favorites/login');
+            showToast('浏览器已打开，请在弹出的窗口中扫码登录', 'success');
+
+            if (favLoginPollTimer) clearInterval(favLoginPollTimer);
+            const panel = document.getElementById('favSyncPanel');
+            panel.style.display = 'block';
+            panel.innerHTML = `
+                <div class="fav-login-hint">
+                    <div class="hint-icon">📱</div>
+                    <div>请在弹出的浏览器窗口中用抖音 App 扫码登录</div>
+                    <div style="margin-top:8px; font-size:11px; color:var(--c-text-muted)">登录成功后窗口会自动关闭</div>
+                </div>
+            `;
+
+            favLoginPollTimer = setInterval(async () => {
+                try {
+                    const status = await api('GET', '/api/favorites/status');
+                    if (status.loggedIn) {
+                        clearInterval(favLoginPollTimer);
+                        favLoginPollTimer = null;
+                        favIsLoggedIn = true;
+                        updateFavUI(status);
+                        panel.style.display = 'none';
+                        showToast('登录成功！现在可以同步收藏了', 'success');
+                    }
+                } catch (e) { /* ignore */ }
+            }, 2000);
+
+            setTimeout(() => {
+                if (favLoginPollTimer) {
+                    clearInterval(favLoginPollTimer);
+                    favLoginPollTimer = null;
+                    panel.style.display = 'none';
+                }
+            }, 5 * 60 * 1000);
+        } catch (err) {
+            showToast('打开登录窗口失败: ' + err.message, 'error');
+        }
+    }
+}
+
+/**
+ * 同步收藏按钮：只拉取列表，不自动下载
+ */
+async function handleFavoritesSync() {
+    const syncBtn = document.getElementById('favSyncBtn');
+    try {
+        syncBtn.classList.add('syncing');
+        syncBtn.disabled = true;
+        syncBtn.querySelector('span').textContent = '同步中...';
+
+        const result = await api('POST', '/api/favorites/sync', { maxCount: 50 });
+        if (result.taskId) {
+            pollFavSync(result.taskId);
+        }
+    } catch (err) {
+        if (err.message.includes('已有同步任务')) {
+            showToast('已有同步任务在进行中', 'error');
+        } else if (err.message.includes('未登录') || err.message.includes('失效')) {
+            showToast('登录态已失效，请重新登录', 'error');
+            favIsLoggedIn = false;
+            updateFavUI({ loggedIn: false });
+        } else {
+            showToast('同步失败: ' + err.message, 'error');
+        }
+        syncBtn.classList.remove('syncing');
+        syncBtn.disabled = false;
+        syncBtn.querySelector('span').textContent = '同步收藏';
+    }
+}
+
+/**
+ * 轮询同步任务（只拉取列表阶段）
+ */
+function pollFavSync(taskId) {
+    const panel = document.getElementById('favSyncPanel');
+    panel.style.display = 'block';
+
+    if (favSyncPollTimer) clearInterval(favSyncPollTimer);
+
+    favSyncPollTimer = setInterval(async () => {
+        try {
+            const task = await api('GET', `/api/favorites/sync/${taskId}`);
+
+            if (task.status === 'fetching') {
+                panel.innerHTML = `
+                    <div class="fav-sync-header">
+                        <span class="fav-sync-phase">${task.phase || '正在获取收藏列表...'}</span>
+                        <span class="fav-sync-counter">已发现 ${task.collected || 0} 条</span>
+                    </div>
+                    <div class="fav-sync-progress">
+                        <div class="fav-sync-progress-fill indeterminate" style="width:30%"></div>
+                    </div>
+                `;
+            } else if (task.status === 'done' || task.status === 'error') {
+                clearInterval(favSyncPollTimer);
+                favSyncPollTimer = null;
+
+                const syncBtn = document.getElementById('favSyncBtn');
+                syncBtn.classList.remove('syncing');
+                syncBtn.disabled = false;
+                syncBtn.querySelector('span').textContent = '同步收藏';
+                loadFavStatus();
+
+                if (task.status === 'error') {
+                    panel.innerHTML = `<div class="fav-login-hint" style="color:var(--c-error)">❌ ${task.error || '获取失败'}</div>`;
+                    showToast('获取收藏列表失败', 'error');
+                } else {
+                    favSyncedItems = task.items || [];
+                    favDownloadStates = {};
+                    renderFavList();
+                    const newCount = favSyncedItems.filter(i => !i.alreadyDownloaded && !i.parseError).length;
+                    showToast(`已获取 ${task.items.length} 条收藏，${newCount} 条未下载`, 'success');
+                }
+            }
+        } catch (err) {
+            console.error('轮询同步进度失败:', err);
+        }
+    }, 1000);
+}
+
+/**
+ * 渲染收藏列表（分两组：未下载 + 已下载折叠）
+ */
+let favDownloadedExpanded = false;
+
+function renderFavList() {
+    const panel = document.getElementById('favSyncPanel');
+    if (!favSyncedItems || favSyncedItems.length === 0) {
+        panel.innerHTML = '<div class="fav-login-hint">收藏列表为空</div>';
+        return;
+    }
+
+    const undownloaded = [];
+    const downloaded = [];
+    const errored = [];
+
+    favSyncedItems.forEach((item, idx) => {
+        item._idx = idx;
+        if (item.parseError) {
+            errored.push(item);
+        } else {
+            const ds = favDownloadStates[item.awemeId];
+            const isDone = item.alreadyDownloaded || (ds && ds.status === 'done');
+            if (isDone) {
+                downloaded.push(item);
+            } else {
+                undownloaded.push(item);
+            }
+        }
+    });
+
+    let html = '';
+
+    // 未下载区域
+    html += `<div class="fav-group">
+        <div class="fav-sync-header" style="margin-bottom:10px">
+            <span class="fav-sync-phase">📥 未下载 (${undownloaded.length})</span>
+            ${undownloaded.length > 0 ? `<button class="btn btn--sync" onclick="downloadAllFavItems()" style="padding:5px 12px;font-size:12px">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                <span>全部下载</span>
+            </button>` : ''}
+        </div>`;
+
+    if (undownloaded.length === 0) {
+        html += '<div style="padding:12px 0;text-align:center;color:var(--c-text-muted);font-size:13px">🎉 全部已下载</div>';
+    } else {
+        html += '<div class="fav-sync-items">';
+        html += undownloaded.map(item => renderFavItemCard(item, false)).join('');
+        html += '</div>';
+    }
+    html += '</div>';
+
+    // 已下载区域（可折叠）
+    if (downloaded.length > 0) {
+        html += `<div class="fav-group" style="margin-top:16px">
+            <div class="fav-sync-header fav-downloaded-toggle" onclick="toggleDownloadedList()" style="cursor:pointer;margin-bottom:${favDownloadedExpanded ? '10' : '0'}px">
+                <span class="fav-sync-phase" style="display:flex;align-items:center;gap:6px">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"
+                         style="transition:transform 0.2s;transform:rotate(${favDownloadedExpanded ? '90' : '0'}deg)">
+                        <polyline points="9 18 15 12 9 6"/>
+                    </svg>
+                    ✅ 已下载 (${downloaded.length})
+                </span>
+                <span class="fav-sync-counter" style="font-size:11px;color:var(--c-text-muted)">点击${favDownloadedExpanded ? '收起' : '展开'}</span>
+            </div>`;
+
+        if (favDownloadedExpanded) {
+            html += '<div class="fav-sync-items">';
+            html += downloaded.map(item => renderFavItemCard(item, true)).join('');
+            html += '</div>';
+        }
+        html += '</div>';
+    }
+
+    if (errored.length > 0) {
+        html += '<div style="margin-top:12px">';
+        html += errored.map(item => `<div class="fav-sync-item" style="opacity:0.5;padding:6px 12px">
+            <svg class="fav-sync-item-status error" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            <span class="fav-sync-item-title">${item.title} (解析失败)</span>
+        </div>`).join('');
+        html += '</div>';
+    }
+
+    panel.innerHTML = html;
+}
+
+function renderFavItemCard(item, isDownloadedSection) {
+    const idx = item._idx;
+    const coverHtml = item.cover
+        ? `<img src="${item.cover}" style="width:40px;height:40px;border-radius:6px;object-fit:cover;flex-shrink:0" onerror="this.style.display='none'">`
+        : '';
+
+    const dState = favDownloadStates[item.awemeId];
+    const isDownloading = dState && dState.status === 'downloading';
+    const isDownloaded = item.alreadyDownloaded || (dState && dState.status === 'done');
+    const isError = dState && dState.status === 'error';
+
+    let actionHtml = '';
+
+    if (isDownloading) {
+        const progress = dState.progress || 0;
+        actionHtml = `<div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+            <div style="width:60px;height:4px;background:var(--c-border);border-radius:2px;overflow:hidden">
+                <div style="width:${progress}%;height:100%;background:linear-gradient(90deg,var(--c-primary),var(--c-accent));border-radius:2px;transition:width 0.3s"></div>
+            </div>
+            <span style="font-size:11px;color:var(--c-primary);font-family:var(--font-mono);white-space:nowrap">${progress}%</span>
+        </div>`;
+    } else if (isDownloadedSection && isDownloaded) {
+        actionHtml = `<div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+            <button class="btn btn--primary" style="padding:4px 10px;font-size:11px;border-radius:6px;opacity:0.7" onclick="redownloadFavItem(${idx})" title="重新下载">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+                    <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                </svg>
+            </button>
+            <button class="action-btn action-btn--open" style="opacity:1" onclick="openFavFile(${idx})" title="打开文件夹">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                </svg>
+            </button>
+            <button class="action-btn action-btn--delete" style="opacity:1" onclick="deleteFavFile(${idx})" title="删除文件">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6"/>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                </svg>
+            </button>
+        </div>`;
+    } else if (!isDownloaded) {
+        actionHtml = `<button class="btn btn--primary" style="padding:5px 14px;font-size:12px;border-radius:8px;white-space:nowrap;flex-shrink:0" onclick="downloadFavItem(${idx})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            <span>下载</span>
+        </button>`;
+    }
+
+    if (isError && !isDownloaded) {
+        actionHtml = `<div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+            <span style="font-size:11px;color:var(--c-error)">失败</span>
+            <button class="btn btn--primary" style="padding:4px 10px;font-size:11px;border-radius:6px" onclick="downloadFavItem(${idx})">重试</button>
+        </div>`;
+    }
+
+    const authorHtml = item.author ? `<span style="font-size:11px;color:var(--c-text-muted)">@${item.author}</span>` : '';
+
+    return `<div class="fav-sync-item" style="padding:10px 12px;gap:10px">
+        ${coverHtml}
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+            <span class="fav-sync-item-title" title="${item.title}">${item.title}</span>
+            ${authorHtml}
+        </div>
+        ${actionHtml}
+    </div>`;
+}
+
+function toggleDownloadedList() {
+    favDownloadedExpanded = !favDownloadedExpanded;
+    renderFavList();
+}
+
+async function downloadFavItem(idx) {
+    const item = favSyncedItems[idx];
+    if (!item) return;
+
+    const awemeId = item.awemeId;
+    if (favDownloadStates[awemeId] && favDownloadStates[awemeId].status === 'downloading') return;
+
+    item.alreadyDownloaded = false;
+    favDownloadStates[awemeId] = { status: 'downloading', progress: 0 };
+    renderFavList();
+
+    try {
+        const result = await api('POST', '/api/download', {
+            type: item.type,
+            videoUrl: item.videoUrl,
+            images: item.images,
+            title: item.title,
+            awemeId: item.awemeId,
+            platform: item.platform || 'douyin',
+        });
+        if (!result.taskId) throw new Error('No taskId');
+
+        const pollId = setInterval(async () => {
+            try {
+                const task = await api('GET', `/api/download/${result.taskId}`);
+                favDownloadStates[awemeId].progress = task.progress || 0;
+
+                if (task.status === 'done') {
+                    clearInterval(pollId);
+                    favDownloadStates[awemeId] = { status: 'done', filePath: task.filePath, fileName: task.fileName, fileSize: task.fileSize };
+                    item.alreadyDownloaded = true;
+                    renderFavList();
+                    addToHistory({
+                        fileName: task.fileName,
+                        filePath: task.filePath,
+                        fileSize: task.fileSize,
+                        info: { title: item.title, cover: item.cover, type: item.type },
+                    });
+                    loadHistory();
+                } else if (task.status === 'error') {
+                    clearInterval(pollId);
+                    favDownloadStates[awemeId].status = 'error';
+                    renderFavList();
+                    showToast(`下载失败: ${task.error || '未知错误'}`, 'error');
+                } else {
+                    renderFavList();
+                }
+            } catch (e) { /* ignore */ }
+        }, 500);
+    } catch (err) {
+        favDownloadStates[awemeId].status = 'error';
+        renderFavList();
+        showToast('下载请求失败: ' + err.message, 'error');
+    }
+}
+
+async function redownloadFavItem(idx) {
+    const item = favSyncedItems[idx];
+    if (!item) return;
+    item.alreadyDownloaded = false;
+    delete favDownloadStates[item.awemeId];
+    await downloadFavItem(idx);
+}
+
+async function openFavFile(idx) {
+    const item = favSyncedItems[idx];
+    if (!item) return;
+    // 优先用下载状态中的路径，其次用同步 API 返回的路径
+    const ds = favDownloadStates[item.awemeId];
+    const fp = (ds && ds.filePath) || item.filePath;
+    if (fp) {
+        await openHistoryFile(fp);
+    } else {
+        showToast('未找到本地文件路径', 'info');
+    }
+}
+
+async function deleteFavFile(idx) {
+    const item = favSyncedItems[idx];
+    if (!item) return;
+    const ds = favDownloadStates[item.awemeId];
+    const fp = (ds && ds.filePath) || item.filePath;
+    if (!fp) {
+        showToast('未找到本地文件路径', 'info');
+        return;
+    }
+    if (!confirm(`确定删除文件？\n${fp}`)) return;
+    try {
+        await api('POST', '/api/history/delete', { filePath: fp });
+        showToast('文件已删除', 'success');
+        // 从历史记录中也删掉
+        let history = JSON.parse(localStorage.getItem('dy_history') || '[]');
+        history = history.filter(h => h.filePath !== fp);
+        localStorage.setItem('dy_history', JSON.stringify(history));
+        loadHistory();
+    } catch (err) {
+        if (err.message.includes('不存在')) {
+            showToast('文件已经不存在了', 'info');
+        } else {
+            showToast('删除失败: ' + err.message, 'error');
+            return;
+        }
+    }
+    // 标记为未下载状态
+    item.alreadyDownloaded = false;
+    delete favDownloadStates[item.awemeId];
+    renderFavList();
+}
+
+async function downloadAllFavItems() {
+    for (let i = 0; i < favSyncedItems.length; i++) {
+        const item = favSyncedItems[i];
+        if (item.alreadyDownloaded || item.parseError) continue;
+        const ds = favDownloadStates[item.awemeId];
+        if (ds && (ds.status === 'downloading' || ds.status === 'done')) continue;
+        await downloadFavItem(i);
+    }
 }

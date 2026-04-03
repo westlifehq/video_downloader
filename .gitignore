@@ -3,7 +3,28 @@ node_modules/
 *.log
 config.json
 douyin-downloader.exe
+douyin-downloader-mac
 *.apk
 *.zip
 *.tar.gz
 video-downloader.exe
+user_data/
+synced_ids.json
+
+# 排除生成的二进制文件
+*.exe
+douyin-downloader-mac
+
+# 排除实验性杂碎文件
+test_*.js
+current_doc_state.json
+fetched_doc.json
+fetched_doc.md
+summary.md
+svt_fds.md
+feishu-summary.skill
+update_feishu.js
+upload_feishu.js
+output.txt
+test_update_whiteboard*.js
+test_whiteboard.js

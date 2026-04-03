@@ -5,6 +5,7 @@ const { exec } = require('child_process');
 const { v4: uuidv4 } = require('uuid');
 const douyin = require('./lib/douyin');
 const xhs = require('./lib/xhs');
+const favorites = require('./lib/douyin-favorites');
 
 
 const app = express();
@@ -224,6 +225,10 @@ app.post('/api/download', async (req, res) => {
             task.progress = 100;
             task.fileSize = result.fileSize;
         }
+        // 记录已下载的 awemeId（收藏同步用）
+        if (awemeId) {
+            try { favorites.saveSyncedIds([awemeId]); } catch (e) { }
+        }
         console.log(`[下载] 完成: ${savePath} (${(result.fileSize / 1024 / 1024).toFixed(2)} MB)`);
     } catch (err) {
         const task = downloadTasks.get(taskId);
@@ -320,6 +325,164 @@ app.post('/api/history/delete', (req, res) => {
         console.error(`[删除文件] 失败: ${err.message}`);
         res.status(500).json({ error: `删除失败: ${err.message}` });
     }
+});
+
+// ═══════════════════════════════════════════
+// 收藏同步 API
+// ═══════════════════════════════════════════
+
+// 收藏同步任务存储
+const favSyncTasks = new Map();
+
+/**
+ * GET /api/favorites/status — 获取登录状态和同步信息
+ */
+app.get('/api/favorites/status', (req, res) => {
+    try {
+        const status = favorites.checkLoginStatus();
+        res.json(status);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * POST /api/favorites/login — 打开浏览器让用户扫码登录
+ */
+app.post('/api/favorites/login', async (req, res) => {
+    try {
+        // 先返回"正在打开浏览器"，不阻塞请求
+        res.json({ success: true, message: '浏览器已打开，请在弹出的窗口中扫码登录' });
+
+        // 后台执行登录（用户需要在弹出的浏览器中扫码）
+        favorites.openLoginBrowser()
+            .then(() => console.log('[收藏同步] 用户登录成功'))
+            .catch(err => console.error('[收藏同步] 登录失败:', err.message));
+    } catch (err) {
+        // 如果还没发送响应
+        if (!res.headersSent) {
+            res.status(500).json({ error: err.message });
+        }
+    }
+});
+
+/**
+ * POST /api/favorites/logout — 退出登录
+ */
+app.post('/api/favorites/logout', (req, res) => {
+    try {
+        const result = favorites.logout();
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * POST /api/favorites/sync — 获取收藏列表（只拉列表，不自动下载）
+ */
+app.post('/api/favorites/sync', async (req, res) => {
+    const maxCount = req.body.maxCount || 50;
+
+    // 检查是否已有同步任务在进行
+    for (const task of favSyncTasks.values()) {
+        if (task.status === 'fetching') {
+            return res.status(409).json({ error: '已有同步任务进行中', taskId: task.id });
+        }
+    }
+
+    const taskId = uuidv4();
+    const task = {
+        id: taskId,
+        status: 'fetching',
+        phase: '正在获取收藏列表...',
+        collected: 0,
+        maxCount,
+        items: [],
+        error: null,
+        startTime: Date.now(),
+    };
+    favSyncTasks.set(taskId, task);
+
+    res.json({ success: true, taskId });
+
+    try {
+        const rawItems = await favorites.fetchFavorites(maxCount, (collected, max, current) => {
+            task.collected = collected;
+            task.maxCount = max;
+            task.current = current;
+        });
+
+        if (rawItems.length === 0) {
+            task.status = 'done';
+            task.phase = '收藏列表为空';
+            return;
+        }
+
+        const syncedData = favorites.getSyncedData();
+        const syncedIds = new Set(syncedData.ids || []);
+        const config = readConfig();
+        let downloadDir = config.downloadDir || path.join(require('os').homedir(), 'Downloads', 'douyin');
+
+        for (const rawItem of rawItems) {
+            try {
+                const info = douyin.normalizeVideoData(rawItem);
+                const awemeId = info.awemeId || '';
+                const isImage = info.type === 'image';
+                const safeName = douyin.sanitizeFilename(info.title || awemeId || 'douyin');
+                const fileName = isImage
+                    ? `[图集]_${safeName}`
+                    : `${safeName}_${awemeId || Date.now()}.mp4`;
+                const savePath = path.join(downloadDir, fileName);
+                const alreadyDownloaded = syncedIds.has(awemeId) || fs.existsSync(savePath);
+
+                task.items.push({
+                    type: info.type,
+                    videoUrl: info.videoUrl,
+                    images: info.images,
+                    title: info.title,
+                    author: info.author,
+                    cover: info.cover,
+                    awemeId,
+                    duration: info.duration,
+                    width: info.width,
+                    height: info.height,
+                    platform: 'douyin',
+                    alreadyDownloaded,
+                    fileName,
+                    filePath: savePath,
+                });
+            } catch (err) {
+                task.items.push({
+                    title: rawItem.desc || '未知',
+                    awemeId: rawItem.aweme_id || '',
+                    cover: '',
+                    parseError: err.message,
+                    alreadyDownloaded: false,
+                });
+            }
+        }
+
+        task.status = 'done';
+        task.phase = `已获取 ${task.items.length} 条收藏`;
+        console.log(`[收藏同步] ${task.phase}`);
+    } catch (err) {
+        task.status = 'error';
+        task.error = err.message;
+        task.phase = '获取收藏列表失败';
+        console.error(`[收藏同步] 错误: ${err.message}`);
+    }
+});
+
+/**
+ * GET /api/favorites/sync/:taskId — 查询同步任务进度
+ */
+app.get('/api/favorites/sync/:taskId', (req, res) => {
+    const task = favSyncTasks.get(req.params.taskId);
+    if (!task) {
+        return res.status(404).json({ error: '任务不存在' });
+    }
+    res.json(task);
 });
 
 // 启动服务器

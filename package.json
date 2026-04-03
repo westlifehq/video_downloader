@@ -5,16 +5,26 @@
   "main": "server.js",
   "scripts": {
     "dev": "node server.js",
-    "start": "node server.js"
+    "start": "node server.js",
+    "build-win": "pkg . --targets node18-win-x64 --output douyin-downloader.exe",
+    "build-mac": "pkg . --targets node18-macos-x64 --output douyin-downloader-mac"
   },
   "dependencies": {
     "axios": "^0.27.2",
     "express": "^4.21.0",
+    "playwright": "^1.59.1",
     "uuid": "^10.0.0"
   },
   "bin": "server.js",
   "pkg": {
-    "assets": "public/**/*"
+    "assets": [
+      "public/**/*",
+      "lib/**/*.js"
+    ],
+    "targets": [
+      "node18-win-x64",
+      "node18-macos-x64"
+    ]
   },
   "devDependencies": {
     "pkg": "^5.8.1"

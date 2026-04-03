@@ -62,6 +62,41 @@
     <!-- 错误提示 -->
     <div id="errorMsg" class="error-msg" style="display:none"></div>
 
+    <!-- 收藏同步 -->
+    <section class="favorites-section" id="favoritesSection">
+      <div class="favorites-header">
+        <div class="favorites-title">
+          <svg class="fav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+          </svg>
+          <span>抖音收藏同步</span>
+          <span class="fav-account-badge" id="favAccountBadge" style="display:none">
+            <span class="badge-dot"></span>
+            <span id="favAccountText">已登录</span>
+          </span>
+        </div>
+        <div class="favorites-actions">
+          <button class="btn btn--account" id="favAccountBtn" onclick="handleFavAccount()" title="登录/切换账号">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+              <circle cx="12" cy="7" r="4"/>
+            </svg>
+            <span id="favAccountBtnText">登录</span>
+          </button>
+          <button class="btn btn--sync" id="favSyncBtn" onclick="handleFavoritesSync()" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+              <polyline points="23 4 23 10 17 10"/>
+              <polyline points="1 20 1 14 7 14"/>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+            </svg>
+            <span>同步收藏</span>
+          </button>
+        </div>
+      </div>
+      <!-- 同步进度面板 -->
+      <div id="favSyncPanel" class="fav-sync-panel" style="display:none"></div>
+    </section>
+
     <!-- 解析结果列表容器 -->
     <div id="resultsContainer" class="results-container"></div>
 

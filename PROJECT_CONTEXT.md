@@ -18,3 +18,4 @@ Video Downloader 是一款基于 Node.js 构建的全平台（目前支持抖音
 ## 部署与运行架构
 1. **本地开发/单机使用**：直接 `npm run dev` 启动，通过 `localhost:3000` 访问。根目录的文件保持完全无污染的原生状态。
 2. **服务器化/NAS 部署 (nas-deployment)**：独立的 `nas-deployment` 文件夹包含了支持 Docker 环境的代码。可以直接将其构建为 Docker 镜像，部署在飞牛 OS (fnOS) 等 x86 NAS 上。该版本包含了针对远程环境、移动端浏览器的特殊优化（如 `0.0.0.0` 绑定、无 TTY 检测关闭、手机下载兼容）。
+3. **外网访问优化 (DDNSTO)**：通过飞牛原生 Docker 部署了 DDNSTO 穿透服务，实现外网通过 HTTPS 域名直接控制 NAS 的下载任务。
