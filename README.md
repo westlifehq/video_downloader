@@ -3,7 +3,7 @@
 > 🚀 一个基于 Node.js 构建的现代化、极简、高颜值的全平台视频内容解析及下载工具。
 
 ![UI Preview](https://img.shields.io/badge/Status-Active-success)
-![Version](https://img.shields.io/badge/Version-1.2.0-blue)
+![Version](https://img.shields.io/badge/Version-2.1.0-blue)
 ![Nodejs](https://img.shields.io/badge/Node.js-18.x-blue)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 
@@ -36,8 +36,8 @@
 
 1. 克隆本项目到本地
 ```bash
-git clone https://github.com/yourusername/douyin-downloader.git
-cd douyin-downloader
+git clone https://github.com/westlifehq/video_downloader.git
+cd video_downloader
 ```
 
 2. 安装依赖模块
@@ -89,6 +89,7 @@ npm run build-mac
 **主要特性：**
 * 完整移除本地相关依赖，专门针对 Docker 优化（默认绑定 `0.0.0.0`，无 TTY 崩溃问题）
 * 自带 `Dockerfile` 与 `docker-compose.yml`，支持一键构建与启动
+* 推荐配合飞牛 (FN OS) 的原生 Docker 运行 DDNSTO 进行内网穿透
 * 新增通过环境变量 `DOWNLOAD_DIR` 灵活映射物理下载路径
 * 前端 UI 专门对移动端浏览器（如 Safari、夸克、UC 等）增加了 **「保存到手机」** 的 HTTP 直接下载适配，自动处理文件名中文乱码与特殊浏览器格式限制问题。
 
@@ -115,7 +116,7 @@ npm run build-mac
 
 ## 🤝 贡献与支持 (Contributing)
 
-欢迎提交 [Issue](https://github.com/yourusername/douyin-downloader/issues) 反馈 Bug 或提交 [Pull Request](https://github.com/yourusername/douyin-downloader/pulls) 完善功能。
+欢迎提交 [Issue](https://github.com/westlifehq/video_downloader/issues) 反馈 Bug 或提交 [Pull Request](https://github.com/westlifehq/video_downloader/pulls) 完善功能。
 
 如果你觉得这个小工具好用，不妨点个 ⭐️ **Star** 支持一下开发者！
 
