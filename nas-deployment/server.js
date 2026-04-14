@@ -5,6 +5,7 @@ const { exec } = require('child_process');
 const { v4: uuidv4 } = require('uuid');
 const douyin = require('./lib/douyin');
 const xhs = require('./lib/xhs');
+const favorites = require('./lib/douyin-favorites');
 
 
 const app = express();
@@ -24,12 +25,6 @@ function pressAnyKeyToExit() {
     console.log('\n================================');
     console.log('程序遇到错误，请截图发给开发者。');
     console.log('按任意键退出...');
-    // Docker 容器内没有 TTY，直接退出
-    if (!process.stdin.isTTY) {
-        console.error('（非交互模式，3秒后自动退出）');
-        setTimeout(() => process.exit(1), 3000);
-        return;
-    }
     process.stdin.setRawMode(true);
     process.stdin.resume();
     process.stdin.on('data', process.exit.bind(process, 1));
@@ -48,6 +43,20 @@ process.on('unhandledRejection', (err) => {
 
 // 下载任务状态存储
 const downloadTasks = new Map();
+
+/**
+ * 获取当前的有效下载目录 (优先级：环境变量 > 配置文件 > 默认路径)
+ */
+function getEffectiveDownloadDir() {
+    const config = readConfig();
+    if (process.env.DOWNLOAD_DIR) {
+        return process.env.DOWNLOAD_DIR;
+    }
+    if (config.downloadDir) {
+        return config.downloadDir;
+    }
+    return path.join(require('os').homedir(), 'Downloads', 'douyin');
+}
 
 /**
  * 读取配置
@@ -72,11 +81,11 @@ function writeConfig(config) {
  */
 app.get('/api/config', (req, res) => {
     const config = readConfig();
-    // 如果没有设置下载目录，优先用环境变量（Docker），否则用默认值
-    if (!config.downloadDir) {
-        config.downloadDir = process.env.DOWNLOAD_DIR || path.join(require('os').homedir(), 'Downloads', 'douyin');
-    }
-    res.json(config);
+    // 返回包含当前有效路径的配置
+    res.json({
+        ...config,
+        downloadDir: getEffectiveDownloadDir()
+    });
 });
 
 /**
@@ -163,12 +172,7 @@ app.post('/api/download', async (req, res) => {
     console.log(`[下载] 收到请求: ${title}, 平台: ${platform || '未知'}, 类型: ${type}`);
     console.log(`[下载] URL: ${videoUrl || (images ? images[0] : '无')}`);
 
-
-    const config = readConfig();
-    let downloadDir = config.downloadDir;
-    if (!downloadDir) {
-        downloadDir = process.env.DOWNLOAD_DIR || path.join(require('os').homedir(), 'Downloads', 'douyin');
-    }
+    const downloadDir = getEffectiveDownloadDir();
 
     // 确保下载目录存在
     if (!fs.existsSync(downloadDir)) {
@@ -229,6 +233,10 @@ app.post('/api/download', async (req, res) => {
             task.status = 'done';
             task.progress = 100;
             task.fileSize = result.fileSize;
+        }
+        // 记录已下载的 awemeId（收藏同步用）
+        if (awemeId) {
+            try { favorites.saveSyncedIds([awemeId]); } catch (e) { }
         }
         console.log(`[下载] 完成: ${savePath} (${(result.fileSize / 1024 / 1024).toFixed(2)} MB)`);
     } catch (err) {
@@ -328,34 +336,208 @@ app.post('/api/history/delete', (req, res) => {
     }
 });
 
+// ═══════════════════════════════════════════
+// 收藏同步 API
+// ═══════════════════════════════════════════
+
+// 收藏同步任务存储
+const favSyncTasks = new Map();
+
 /**
- * GET /api/file/:taskId/:filename? — 浏览器直接下载文件（保存到手机用）
+ * GET /api/favorites/status — 获取登录状态和同步信息
  */
-app.get('/api/file/:taskId/:filename?', (req, res) => {
-    const task = downloadTasks.get(req.params.taskId);
+app.get('/api/favorites/status', (req, res) => {
+    try {
+        const status = favorites.checkLoginStatus();
+        // 如果正在登录中，尝试获取二维码
+        status.qrCode = favorites.getLoginQr ? favorites.getLoginQr() : null;
+        res.json(status);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * POST /api/favorites/login — 打开浏览器让用户扫码登录
+ */
+app.post('/api/favorites/login', async (req, res) => {
+    try {
+        // 先返回"正在打开浏览器"，不阻塞请求
+        res.json({ success: true, message: '浏览器已打开，请在弹出的窗口中扫码登录' });
+
+        // 后台执行登录（用户需要在弹出的浏览器中扫码）
+        favorites.openLoginBrowser()
+            .then(() => console.log('[收藏同步] 用户登录成功'))
+            .catch(err => console.error('[收藏同步] 登录失败:', err.message));
+    } catch (err) {
+        // 如果还没发送响应
+        if (!res.headersSent) {
+            res.status(500).json({ error: err.message });
+        }
+    }
+});
+
+/**
+ * POST /api/favorites/logout — 退出登录
+ */
+app.post('/api/favorites/logout', async (req, res) => {
+    try {
+        const result = await favorites.logout();
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * POST /api/favorites/cookie-login — 手动注入 Cookie
+ */
+app.post('/api/favorites/cookie-login', async (req, res) => {
+    try {
+        const { cookie } = req.body;
+        if (!cookie) {
+            return res.status(400).json({ error: '请提供 Cookie' });
+        }
+        await favorites.loginWithCookie(cookie);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Cookie 注入失败:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * POST /api/favorites/sync — 获取收藏列表（只拉列表，不自动下载）
+ */
+app.post('/api/favorites/sync', async (req, res) => {
+    const maxCount = req.body.maxCount || 50;
+
+    // 检查是否已有同步任务在进行
+    for (const task of favSyncTasks.values()) {
+        if (task.status === 'fetching') {
+            return res.status(409).json({ error: '已有同步任务进行中', taskId: task.id });
+        }
+    }
+
+    const taskId = uuidv4();
+    const task = {
+        id: taskId,
+        status: 'fetching',
+        phase: '正在获取收藏列表...',
+        collected: 0,
+        maxCount,
+        items: [],
+        error: null,
+        startTime: Date.now(),
+        interrupted: false,
+    };
+    favSyncTasks.set(taskId, task);
+
+    res.json({ success: true, taskId });
+
+    try {
+        const rawItems = await favorites.fetchFavorites(maxCount, (collected, max, current) => {
+            task.collected = collected;
+            task.maxCount = max;
+            task.current = current;
+        }, () => task.interrupted);
+
+        if (rawItems.length === 0) {
+            task.status = 'done';
+            task.phase = '收藏列表为空';
+            return;
+        }
+
+        const syncedData = favorites.getSyncedData();
+        const syncedIds = new Set(syncedData.ids || []);
+        
+        // 确定下载目录逻辑
+        const downloadDir = getEffectiveDownloadDir();
+        
+        for (const rawItem of rawItems) {
+            try {
+                const info = douyin.normalizeVideoData(rawItem);
+                const awemeId = info.awemeId || '';
+                const isImage = info.type === 'image';
+                const safeName = douyin.sanitizeFilename(info.title || awemeId || 'douyin');
+                const fileName = isImage
+                    ? `[图集]_${safeName}`
+                    : `${safeName}_${awemeId || Date.now()}.mp4`;
+                const savePath = path.join(downloadDir, fileName);
+                const alreadyDownloaded = syncedIds.has(awemeId) || fs.existsSync(savePath);
+
+                task.items.push({
+                    type: info.type,
+                    videoUrl: info.videoUrl,
+                    images: info.images,
+                    title: info.title,
+                    author: info.author,
+                    cover: info.cover,
+                    awemeId,
+                    duration: info.duration,
+                    width: info.width,
+                    height: info.height,
+                    platform: 'douyin',
+                    alreadyDownloaded,
+                    fileName,
+                    filePath: savePath,
+                });
+            } catch (err) {
+                task.items.push({
+                    title: rawItem.desc || '未知',
+                    awemeId: rawItem.aweme_id || '',
+                    cover: '',
+                    parseError: err.message,
+                    alreadyDownloaded: false,
+                });
+            }
+        }
+
+        task.status = 'done';
+        task.phase = task.interrupted ? `已打断，获取到 ${task.items.length} 条收藏` : `已获取 ${task.items.length} 条收藏`;
+        console.log(`[收藏同步] ${task.phase}`);
+    } catch (err) {
+        task.status = 'error';
+        task.error = err.message;
+        task.phase = '获取收藏列表失败';
+        console.error(`[收藏同步] 错误: ${err.message}`);
+    }
+});
+
+/**
+ * POST /api/favorites/sync/stop — 打断同步任务
+ */
+app.post('/api/favorites/sync/stop', (req, res) => {
+    const { taskId } = req.body;
+    if (!taskId) return res.status(400).json({ error: '未提供 taskId' });
+    
+    const task = favSyncTasks.get(taskId);
     if (!task) {
         return res.status(404).json({ error: '任务不存在' });
     }
-    if (task.status !== 'done') {
-        return res.status(400).json({ error: '文件尚未下载完成' });
+    
+    if (task.status === 'fetching') {
+        task.interrupted = true;
+        console.log(`[收藏同步] 接收到打断信号 taskId=${taskId}`);
+        return res.json({ success: true, message: '打断信号已发送' });
     }
-    if (!fs.existsSync(task.filePath)) {
-        return res.status(404).json({ error: '文件不存在' });
-    }
+    
+    res.json({ success: false, message: '任务不在获取阶段，无法打断' });
+});
 
-    // 对图集目录暂不支持浏览器下载
-    const stats = fs.statSync(task.filePath);
-    if (stats.isDirectory()) {
-        return res.status(400).json({ error: '图集目录暂不支持直接下载，请从 NAS 文件管理器访问' });
+/**
+ * GET /api/favorites/sync/:taskId — 查询同步任务进度
+ */
+app.get('/api/favorites/sync/:taskId', (req, res) => {
+    const task = favSyncTasks.get(req.params.taskId);
+    if (!task) {
+        return res.status(404).json({ error: '任务不存在' });
     }
-
-    // 针对夸克、UC等移动端浏览器的特殊兼容：强制设为 octet-stream 并由 URL 结尾提供文件名
-    res.setHeader('Content-Type', 'application/octet-stream');
-    res.download(task.filePath, task.fileName);
+    res.json(task);
 });
 
 // 启动服务器
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, () => {
     console.log(`\n🎬 抖音视频下载器已启动`);
-    console.log(`📍 http://0.0.0.0:${PORT}\n`);
+    console.log(`📍 http://localhost:${PORT}\n`);
 });

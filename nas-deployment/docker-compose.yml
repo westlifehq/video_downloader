@@ -7,6 +7,8 @@ services:
       - "3000:3000"
     volumes:
       - /vol2/1000/dy:/downloads
+      - /vol2/1000/video-downloader/user_data:/app/user_data
+      - /vol2/1000/video-downloader/douyin_session.json:/app/douyin_session.json
     environment:
       - NODE_ENV=production
       - DOWNLOAD_DIR=/downloads

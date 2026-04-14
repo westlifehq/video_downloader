@@ -10,7 +10,7 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
     rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=2">
 </head>
 
 <body>
@@ -62,6 +62,69 @@
     <!-- 错误提示 -->
     <div id="errorMsg" class="error-msg" style="display:none"></div>
 
+    <!-- 收藏同步 -->
+    <section class="favorites-section" id="favoritesSection">
+      <div class="favorites-header">
+        <div class="favorites-title">
+          <svg class="fav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+          </svg>
+          <span>抖音收藏同步</span>
+          <span class="fav-account-badge" id="favAccountBadge" style="display:none">
+            <span class="badge-dot"></span>
+            <span id="favAccountText">已登录</span>
+          </span>
+        </div>
+        <div class="favorites-actions">
+          <button class="btn btn--account" id="favAccountBtn" onclick="handleFavAccount()" title="登录/切换账号">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+              <circle cx="12" cy="7" r="4"/>
+            </svg>
+            <span id="favAccountBtnText">登录</span>
+          </button>
+          <button class="btn btn--sync" id="favSyncBtn" onclick="handleFavoritesSync()" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+              <polyline points="23 4 23 10 17 10"/>
+              <polyline points="1 20 1 14 7 14"/>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+            </svg>
+            <span>同步收藏</span>
+          </button>
+        </div>
+      </div>
+      <!-- 同步进度面板 -->
+      <div id="favSyncPanel" class="fav-sync-panel" style="display:none"></div>
+      
+      <!-- 登录/输入 Cookie 面板 -->
+      <!-- Cookie 注入区域 (不再隐藏，永远提供重新注入的通道) -->
+        <div id="favLoginQrWrap" class="fav-login-qr-wrap" style="display:block; margin-top:20px;">
+            <div class="qr-hint" style="margin-bottom: 16px;">
+              <strong style="color: var(--text-primary); display: block; font-size: 1.1rem; margin-bottom: 8px;">无头扫码已关闭，请使用凭证验证</strong>
+              <p style="color: var(--text-tertiary); font-size: 0.85rem; line-height: 1.5;">由于抖音安全风控升级，NAS 自动登录引擎被阻断。<br>请从电脑浏览器中复制您的 <strong>sessionid</strong> Cookie进行身份绑定。</p>
+            </div>
+            <div style="font-size:14px; margin-bottom:12px; color:var(--c-text);">
+                <span style="font-weight:bold;">您目前未设置 Cookie 凭证</span> 或想要覆盖新凭证。
+            </div>
+            
+            <input type="text" id="cookieInput" class="fav-cookie-input" 
+                   placeholder="请填入您的 sessionid，例如：807c08..." 
+                   autocomplete="off" spellcheck="false" />
+            
+            <button id="cookieSubmitBtn" class="btn btn--primary" onclick="handleCookieSubmit()" style="margin-top:12px; width:100%; border-radius:8px;">
+                注入凭证并登录
+            </button>
+            
+            <div style="margin-top:16px; font-size:12px; color:var(--c-text-muted); line-height:1.6; text-align:left; background:var(--c-bg-sub); padding:10px; border-radius:6px;">
+                <b>如何获取 sessionid？</b><br>
+                1. 电脑浏览器无痕模式打开完整版 <a href="https://www.douyin.com" target="_blank" style="color:var(--c-primary)">抖音网页版</a> 并登录<br>
+                2. 按下 <b>F12</b> 打开开发者工具<br>
+                3. 打开 <b>Application (应用)</b> -> 左侧选择 <b>Cookies</b><br>
+                4. 找到名为 <code>sessionid</code> 的项，双击复制它的值（一串字母数字），贴在上方此框内。
+            </div>
+        </div>
+    </section>
+
     <!-- 解析结果列表容器 -->
     <div id="resultsContainer" class="results-container"></div>
 
@@ -107,7 +170,7 @@
     <p>仅供个人学习研究使用</p>
   </footer>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=20240404"></script>
 </body>
 
 </html>

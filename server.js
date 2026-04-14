@@ -45,6 +45,20 @@ process.on('unhandledRejection', (err) => {
 const downloadTasks = new Map();
 
 /**
+ * 获取当前的有效下载目录 (优先级：环境变量 > 配置文件 > 默认路径)
+ */
+function getEffectiveDownloadDir() {
+    const config = readConfig();
+    if (process.env.DOWNLOAD_DIR) {
+        return process.env.DOWNLOAD_DIR;
+    }
+    if (config.downloadDir) {
+        return config.downloadDir;
+    }
+    return path.join(require('os').homedir(), 'Downloads', 'douyin');
+}
+
+/**
  * 读取配置
  */
 function readConfig() {
@@ -67,11 +81,11 @@ function writeConfig(config) {
  */
 app.get('/api/config', (req, res) => {
     const config = readConfig();
-    // 如果没有设置下载目录，用默认值
-    if (!config.downloadDir) {
-        config.downloadDir = path.join(require('os').homedir(), 'Downloads', 'douyin');
-    }
-    res.json(config);
+    // 返回包含当前有效路径的配置
+    res.json({
+        ...config,
+        downloadDir: getEffectiveDownloadDir()
+    });
 });
 
 /**
@@ -158,12 +172,7 @@ app.post('/api/download', async (req, res) => {
     console.log(`[下载] 收到请求: ${title}, 平台: ${platform || '未知'}, 类型: ${type}`);
     console.log(`[下载] URL: ${videoUrl || (images ? images[0] : '无')}`);
 
-
-    const config = readConfig();
-    let downloadDir = config.downloadDir;
-    if (!downloadDir) {
-        downloadDir = path.join(require('os').homedir(), 'Downloads', 'douyin');
-    }
+    const downloadDir = getEffectiveDownloadDir();
 
     // 确保下载目录存在
     if (!fs.existsSync(downloadDir)) {
@@ -340,6 +349,8 @@ const favSyncTasks = new Map();
 app.get('/api/favorites/status', (req, res) => {
     try {
         const status = favorites.checkLoginStatus();
+        // 如果正在登录中，尝试获取二维码
+        status.qrCode = favorites.getLoginQr ? favorites.getLoginQr() : null;
         res.json(status);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -369,11 +380,28 @@ app.post('/api/favorites/login', async (req, res) => {
 /**
  * POST /api/favorites/logout — 退出登录
  */
-app.post('/api/favorites/logout', (req, res) => {
+app.post('/api/favorites/logout', async (req, res) => {
     try {
-        const result = favorites.logout();
+        const result = await favorites.logout();
         res.json(result);
     } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * POST /api/favorites/cookie-login — 手动注入 Cookie
+ */
+app.post('/api/favorites/cookie-login', async (req, res) => {
+    try {
+        const { cookie } = req.body;
+        if (!cookie) {
+            return res.status(400).json({ error: '请提供 Cookie' });
+        }
+        await favorites.loginWithCookie(cookie);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Cookie 注入失败:', err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -422,9 +450,10 @@ app.post('/api/favorites/sync', async (req, res) => {
 
         const syncedData = favorites.getSyncedData();
         const syncedIds = new Set(syncedData.ids || []);
-        const config = readConfig();
-        let downloadDir = config.downloadDir || path.join(require('os').homedir(), 'Downloads', 'douyin');
-
+        
+        // 确定下载目录逻辑
+        const downloadDir = getEffectiveDownloadDir();
+        
         for (const rawItem of rawItems) {
             try {
                 const info = douyin.normalizeVideoData(rawItem);

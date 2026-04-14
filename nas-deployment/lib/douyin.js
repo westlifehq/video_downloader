@@ -584,6 +584,7 @@ module.exports = {
   resolveShareUrl,
   extractVideoId,
   fetchVideoInfo,
+  normalizeVideoData,
   downloadVideo,
   downloadImages,
   sanitizeFilename,

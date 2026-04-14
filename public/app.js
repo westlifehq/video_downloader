@@ -569,62 +569,90 @@ function formatSyncTime(isoStr) {
  */
 async function handleFavAccount() {
     if (favIsLoggedIn) {
-        if (!confirm('退出当前抖音账号？退出后可重新扫码登录其他账号。')) return;
+        if (!confirm('确认退出当前抖音账号？')) return;
         try {
             await api('POST', '/api/favorites/logout');
-            showToast('已退出登录', 'success');
+            showToast('已退出当前账号', 'success');
             favIsLoggedIn = false;
             updateFavUI({ loggedIn: false });
-            document.getElementById('favSyncPanel').style.display = 'none';
+            
+            // 退出后自动打开注入面板
+            setTimeout(() => {
+                const panel = document.getElementById('favSyncPanel');
+                const qrWrap = document.getElementById('favLoginQrWrap');
+                if (panel) panel.style.display = 'none';
+                if (qrWrap) qrWrap.style.display = 'block';
+                const inputBtn = document.getElementById('cookieInput');
+                if (inputBtn) inputBtn.focus();
+            }, 300);
             favSyncedItems = [];
         } catch (err) {
             showToast('退出失败: ' + err.message, 'error');
         }
     } else {
         try {
-            await api('POST', '/api/favorites/login');
-            showToast('浏览器已打开，请在弹出的窗口中扫码登录', 'success');
-
-            if (favLoginPollTimer) clearInterval(favLoginPollTimer);
+            // 直接展现凭证注入区域
             const panel = document.getElementById('favSyncPanel');
-            panel.style.display = 'block';
-            panel.innerHTML = `
-                <div class="fav-login-hint">
-                    <div class="hint-icon">📱</div>
-                    <div>请在弹出的浏览器窗口中用抖音 App 扫码登录</div>
-                    <div style="margin-top:8px; font-size:11px; color:var(--c-text-muted)">登录成功后窗口会自动关闭</div>
-                </div>
-            `;
-
-            favLoginPollTimer = setInterval(async () => {
-                try {
-                    const status = await api('GET', '/api/favorites/status');
-                    if (status.loggedIn) {
-                        clearInterval(favLoginPollTimer);
-                        favLoginPollTimer = null;
-                        favIsLoggedIn = true;
-                        updateFavUI(status);
-                        panel.style.display = 'none';
-                        showToast('登录成功！现在可以同步收藏了', 'success');
-                    }
-                } catch (e) { /* ignore */ }
-            }, 2000);
-
+            const qrWrap = document.getElementById('favLoginQrWrap');
+            
+            panel.style.display = 'none'; // 隐藏同步面板
+            qrWrap.style.display = 'block'; // 显示手动注入面板
+            
             setTimeout(() => {
-                if (favLoginPollTimer) {
-                    clearInterval(favLoginPollTimer);
-                    favLoginPollTimer = null;
-                    panel.style.display = 'none';
-                }
-            }, 5 * 60 * 1000);
+                const inputBtn = document.getElementById('cookieInput');
+                if (inputBtn) inputBtn.focus();
+            }, 100);
         } catch (err) {
-            showToast('打开登录窗口失败: ' + err.message, 'error');
+            showToast('操作失败: ' + err.message, 'error');
         }
     }
 }
 
 /**
- * 同步收藏按钮：只拉取列表，不自动下载
+ * 展开/收起 手动 Cookie 注入输入框
+ */
+function toggleCookieLogin(e) {
+    if (e) e.preventDefault();
+}
+
+/**
+ * 提交手动注入的 Cookie
+ */
+async function handleCookieSubmit() {
+    const input = document.getElementById('cookieInput');
+    const cookieVal = input.value.trim();
+    const btn = document.getElementById('cookieSubmitBtn');
+    
+    if (!cookieVal) {
+        showToast('请先输入 Cookie 值', 'warning');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = '正在注入...';
+
+    try {
+        await api('POST', '/api/favorites/cookie-login', { cookie: cookieVal });
+        
+        // 清理界面
+        document.getElementById('favLoginQrWrap').style.display = 'none';
+        input.value = '';
+        
+        showToast('账号绑定成功！正在拉取内容...', 'success');
+        
+        // 同步拉取并更新界面状态
+        await loadFavStatus();
+        
+    } catch (err) {
+        showToast('Cookie 验证失败: ' + err.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '验证 Cookie';
+    }
+}
+
+/**
+ * 检测当前本地下载任务情况，构建 "未下载" 和 "已下载" 分组
  */
 async function handleFavoritesSync() {
     const syncBtn = document.getElementById('favSyncBtn');

@@ -10,9 +10,12 @@
     "build-mac": "pkg . --targets node18-macos-x64 --output douyin-downloader-mac"
   },
   "dependencies": {
+    "@larksuite/cli": "^1.0.4",
     "axios": "^0.27.2",
     "express": "^4.21.0",
     "playwright": "^1.59.1",
+    "playwright-extra": "^4.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
     "uuid": "^10.0.0"
   },
   "bin": "server.js",
