@@ -11,6 +11,8 @@ services:
       - /vol2/1000/video-downloader/douyin_session.json:/app/douyin_session.json
       - /vol2/1000/video-downloader/liked_ids.json:/app/liked_ids.json
       - /vol2/1000/video-downloader/synced_ids.json:/app/synced_ids.json
+      - /vol2/1000/video-downloader/schedule_config.json:/app/schedule_config.json
+      - /vol2/1000/video-downloader/schedule_log.json:/app/schedule_log.json
     environment:
       - NODE_ENV=production
       - DOWNLOAD_DIR=/downloads

@@ -83,14 +83,17 @@
             </svg>
             <span id="favAccountBtnText">登录</span>
           </button>
-          <button class="btn btn--sync" id="favSyncBtn" onclick="handleFavoritesSync()" disabled>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-              <polyline points="23 4 23 10 17 10"/>
-              <polyline points="1 20 1 14 7 14"/>
-              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-            </svg>
-            <span>同步收藏</span>
-          </button>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <input type="number" id="favMaxCount" value="50" min="1" max="500" title="同步最近N条" style="width:56px;padding:5px 6px;border-radius:6px;border:1px solid var(--c-border);background:var(--c-bg-sub);color:var(--c-text);font-size:12px;text-align:center;">
+            <button class="btn btn--sync" id="favSyncBtn" onclick="handleFavoritesSync()" disabled>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <polyline points="23 4 23 10 17 10"/>
+                <polyline points="1 20 1 14 7 14"/>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+              </svg>
+              <span>同步收藏</span>
+            </button>
+          </div>
         </div>
       </div>
       <!-- 同步进度面板 -->
@@ -139,18 +142,88 @@
           </span>
         </div>
         <div class="favorites-actions">
-          <button class="btn btn--sync" id="likedSyncBtn" onclick="handleLikedSync()" disabled>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-              <polyline points="23 4 23 10 17 10"/>
-              <polyline points="1 20 1 14 7 14"/>
-              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-            </svg>
-            <span>同步喜欢</span>
-          </button>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <input type="number" id="likedMaxCount" value="50" min="1" max="500" title="同步最近N条" style="width:56px;padding:5px 6px;border-radius:6px;border:1px solid var(--c-border);background:var(--c-bg-sub);color:var(--c-text);font-size:12px;text-align:center;">
+            <button class="btn btn--sync" id="likedSyncBtn" onclick="handleLikedSync()" disabled>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <polyline points="23 4 23 10 17 10"/>
+                <polyline points="1 20 1 14 7 14"/>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+              </svg>
+              <span>同步喜欢</span>
+            </button>
+          </div>
         </div>
       </div>
       <!-- 同步进度面板 -->
       <div id="likedSyncPanel" class="fav-sync-panel" style="display:none"></div>
+    </section>
+
+    <!-- 定时同步设置 -->
+    <section class="favorites-section" id="scheduleSection">
+      <div class="favorites-header">
+        <div class="favorites-title">
+          <svg class="fav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="12 6 12 12 16 14"/>
+          </svg>
+          <span>定时同步</span>
+          <span class="fav-account-badge" id="scheduleBadge" style="display:none">
+            <span class="badge-dot"></span>
+            <span id="scheduleStatusText">已启用</span>
+          </span>
+        </div>
+        <div class="favorites-actions">
+          <button class="btn btn--sync" id="scheduleToggleBtn" onclick="toggleSchedulePanel()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06A1.65 1.65 0 0 0 15 19.4a1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+            <span>设置</span>
+          </button>
+        </div>
+      </div>
+      <div id="schedulePanel" class="fav-sync-panel" style="display:none">
+        <div style="padding:16px;display:flex;flex-direction:column;gap:14px;">
+          <!-- 启用开关 -->
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <label style="font-size:14px;font-weight:500;color:var(--c-text)">启用定时同步</label>
+            <label class="switch">
+              <input type="checkbox" id="scheduleEnabled" onchange="saveScheduleConfig()">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <!-- 执行时间 -->
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <label style="font-size:13px;color:var(--c-text-muted)">执行时间（每天）</label>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input type="time" id="scheduleTime" value="00:00" onchange="saveScheduleConfig()" style="padding:6px 10px;border-radius:6px;border:1px solid var(--c-border);background:var(--c-bg-sub);color:var(--c-text);font-size:14px;">
+              <span style="font-size:12px;color:var(--c-text-muted)">每天自动运行</span>
+            </div>
+          </div>
+          <!-- 同步模式 -->
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <label style="font-size:13px;color:var(--c-text-muted)">同步内容</label>
+            <select id="scheduleSyncMode" onchange="saveScheduleConfig()" style="padding:6px 10px;border-radius:6px;border:1px solid var(--c-border);background:var(--c-bg-sub);color:var(--c-text);font-size:14px;">
+              <option value="both">收藏 + 喜欢 (自动去重)</option>
+              <option value="favorites">仅收藏</option>
+              <option value="liked">仅喜欢</option>
+            </select>
+          </div>
+          <!-- 最大条数 -->
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <label style="font-size:13px;color:var(--c-text-muted)">每次同步最近多少条</label>
+            <input type="number" id="scheduleMaxCount" value="50" min="1" max="500" onchange="saveScheduleConfig()" style="padding:6px 10px;border-radius:6px;border:1px solid var(--c-border);background:var(--c-bg-sub);color:var(--c-text);font-size:14px;width:100px;">
+          </div>
+          <!-- 手动触发 -->
+          <div style="display:flex;gap:8px;margin-top:4px;">
+            <button class="btn btn--primary" onclick="triggerScheduleNow()" style="padding:6px 14px;font-size:13px;border-radius:8px;">立即执行一次</button>
+            <button class="btn btn--secondary" onclick="loadScheduleLogs()" style="padding:6px 14px;font-size:13px;border-radius:8px;">查看日志</button>
+          </div>
+          <!-- 日志面板 -->
+          <div id="scheduleLogPanel" style="display:none;margin-top:8px;max-height:200px;overflow-y:auto;background:var(--c-bg-sub);border-radius:8px;padding:10px;font-size:12px;color:var(--c-text-muted);"></div>
+        </div>
+      </div>
     </section>
 
     <!-- 解析结果列表容器 -->
@@ -161,6 +234,19 @@
       <div class="section-header">
         <h3>下载历史</h3>
         <button class="btn btn--ghost" onclick="clearHistory()">清空</button>
+      </div>
+      <!-- 筛选工具栏 -->
+      <div class="history-filters" id="historyFilters" style="display:none;padding:10px 0;gap:8px;flex-wrap:wrap;align-items:center;">
+        <input type="text" id="historyFilterKeyword" placeholder="搜索标题/作者..." oninput="applyHistoryFilter()" style="padding:5px 10px;border-radius:6px;border:1px solid var(--c-border);background:var(--c-bg-sub);color:var(--c-text);font-size:13px;flex:1;min-width:120px;">
+        <select id="historyFilterAuthor" onchange="applyHistoryFilter()" style="padding:5px 8px;border-radius:6px;border:1px solid var(--c-border);background:var(--c-bg-sub);color:var(--c-text);font-size:13px;">
+          <option value="">全部作者</option>
+        </select>
+        <select id="historyFilterDate" onchange="applyHistoryFilter()" style="padding:5px 8px;border-radius:6px;border:1px solid var(--c-border);background:var(--c-bg-sub);color:var(--c-text);font-size:13px;">
+          <option value="">全部时间</option>
+          <option value="today">今天</option>
+          <option value="week">最近7天</option>
+          <option value="month">最近30天</option>
+        </select>
       </div>
       <div id="historyList" class="history-list"></div>
     </section>

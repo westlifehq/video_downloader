@@ -4,6 +4,8 @@ node_modules/
 config.json
 douyin_session.json
 liked_ids.json
+schedule_config.json
+schedule_log.json
 public/fav_debug.png
 public/login_debug.png
 douyin-downloader.exe

@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const { exec } = require('child_process');
 const { v4: uuidv4 } = require('uuid');
+const cron = require('node-cron');
 const douyin = require('./lib/douyin');
 const xhs = require('./lib/xhs');
 const favorites = require('./lib/douyin-favorites');
@@ -672,8 +673,147 @@ app.get('/api/liked/sync/:taskId', (req, res) => {
     res.json(task);
 });
 
+// ═══════════════════════════════════════════
+// 定时同步 & 下载
+// ═══════════════════════════════════════════
+
+const SCHEDULE_CONFIG_PATH = path.join(exeDir, 'schedule_config.json');
+const SCHEDULE_LOG_PATH = path.join(exeDir, 'schedule_log.json');
+
+function readScheduleConfig() {
+    try { return JSON.parse(fs.readFileSync(SCHEDULE_CONFIG_PATH, 'utf-8')); }
+    catch { return { enabled: false, cronTime: '0 0 * * *', syncMode: 'both', maxCount: 50 }; }
+}
+
+function writeScheduleConfig(cfg) {
+    fs.writeFileSync(SCHEDULE_CONFIG_PATH, JSON.stringify(cfg, null, 2));
+}
+
+function readScheduleLog() {
+    try { return JSON.parse(fs.readFileSync(SCHEDULE_LOG_PATH, 'utf-8')); }
+    catch { return []; }
+}
+
+function appendScheduleLog(entry) {
+    const logs = readScheduleLog();
+    logs.unshift(entry);
+    fs.writeFileSync(SCHEDULE_LOG_PATH, JSON.stringify(logs.slice(0, 50), null, 2));
+}
+
+let scheduledTask = null;
+
+async function runScheduledSync() {
+    const config = readScheduleConfig();
+    const logEntry = { time: new Date().toISOString(), syncMode: config.syncMode, maxCount: config.maxCount, results: [], error: null };
+
+    console.log(`[定时同步] 开始执行，模式=${config.syncMode}，最多=${config.maxCount}条`);
+
+    if (!favorites.checkLoginStatus().loggedIn) {
+        logEntry.error = '未登录，跳过定时同步';
+        appendScheduleLog(logEntry);
+        console.log('[定时同步] 未登录，跳过');
+        return logEntry;
+    }
+
+    const downloadDir = getEffectiveDownloadDir();
+    if (!fs.existsSync(downloadDir)) fs.mkdirSync(downloadDir, { recursive: true });
+
+    const syncedData = favorites.getSyncedData();
+    const likedData = favorites.getLikedData();
+    const allDownloadedIds = new Set([...(syncedData.ids || []), ...(likedData.ids || [])]);
+
+    const allItems = [];
+
+    try {
+        if (config.syncMode === 'favorites' || config.syncMode === 'both') {
+            const favRaw = await favorites.fetchFavorites(config.maxCount, null, null, 'favorite');
+            for (const raw of favRaw) {
+                try { allItems.push({ info: douyin.normalizeVideoData(raw), source: 'favorite' }); } catch (e) { }
+            }
+        }
+        if (config.syncMode === 'liked' || config.syncMode === 'both') {
+            const likedRaw = await favorites.fetchLikedVideos(config.maxCount, null, null);
+            for (const raw of likedRaw) {
+                try { allItems.push({ info: douyin.normalizeVideoData(raw), source: 'liked' }); } catch (e) { }
+            }
+        }
+    } catch (err) {
+        logEntry.error = `同步阶段出错: ${err.message}`;
+        appendScheduleLog(logEntry);
+        return logEntry;
+    }
+
+    const seenIds = new Set();
+    const toDownload = [];
+    for (const { info } of allItems) {
+        const awemeId = info.awemeId || '';
+        if (!awemeId || seenIds.has(awemeId) || allDownloadedIds.has(awemeId)) continue;
+        seenIds.add(awemeId);
+        const isImage = info.type === 'image';
+        const safeName = douyin.sanitizeFilename(info.title || awemeId || 'douyin');
+        const fileName = isImage ? `[图集]_${safeName}` : `${safeName}_${awemeId || Date.now()}.mp4`;
+        const savePath = path.join(downloadDir, fileName);
+        if (fs.existsSync(savePath)) continue;
+        toDownload.push({ info, fileName, savePath });
+    }
+
+    logEntry.totalFound = allItems.length;
+    logEntry.toDownload = toDownload.length;
+
+    let successCount = 0, failCount = 0;
+    for (const { info, fileName, savePath } of toDownload) {
+        try {
+            const referer = 'https://www.douyin.com/';
+            if (info.type === 'image') {
+                await douyin.downloadImages(info.images, savePath, null, referer);
+            } else {
+                await douyin.downloadVideo(info.videoUrl, savePath, null, referer);
+            }
+            if (info.awemeId) {
+                try { favorites.saveSyncedIds([info.awemeId]); } catch (e) { }
+                try { favorites.saveLikedIds([info.awemeId]); } catch (e) { }
+            }
+            successCount++;
+        } catch (err) {
+            failCount++;
+        }
+    }
+
+    logEntry.results = { success: successCount, fail: failCount };
+    appendScheduleLog(logEntry);
+    return logEntry;
+}
+
+function startScheduledTask() {
+    if (scheduledTask) { scheduledTask.stop(); scheduledTask = null; }
+    const config = readScheduleConfig();
+    if (!config.enabled) { console.log('[定时同步] 已禁用'); return; }
+    if (!cron.validate(config.cronTime)) { console.error(`[定时同步] cron 表达式无效: ${config.cronTime}`); return; }
+    scheduledTask = cron.schedule(config.cronTime, () => { runScheduledSync().catch(err => console.error('[定时同步] 执行出错:', err.message)); });
+    console.log(`[定时同步] 已启动，cron="${config.cronTime}", 模式="${config.syncMode}", 最多=${config.maxCount}条`);
+}
+
+app.get('/api/schedule/config', (req, res) => { res.json(readScheduleConfig()); });
+app.post('/api/schedule/config', (req, res) => {
+    const { enabled, cronTime, syncMode, maxCount } = req.body;
+    const cfg = readScheduleConfig();
+    if (typeof enabled === 'boolean') cfg.enabled = enabled;
+    if (cronTime !== undefined) { if (!cron.validate(cronTime)) return res.status(400).json({ error: `无效的 cron 表达式: ${cronTime}` }); cfg.cronTime = cronTime; }
+    if (syncMode && ['favorites', 'liked', 'both'].includes(syncMode)) cfg.syncMode = syncMode;
+    if (maxCount && Number.isInteger(maxCount) && maxCount > 0 && maxCount <= 500) cfg.maxCount = maxCount;
+    writeScheduleConfig(cfg);
+    startScheduledTask();
+    res.json({ success: true, config: cfg });
+});
+app.get('/api/schedule/logs', (req, res) => { res.json(readScheduleLog()); });
+app.post('/api/schedule/run', async (req, res) => {
+    res.json({ success: true, message: '已触发定时同步' });
+    runScheduledSync().catch(err => console.error('[定时同步] 手动触发执行出错:', err.message));
+});
+
 // 启动服务器
 app.listen(PORT, () => {
     console.log(`\n🎬 抖音视频下载器已启动`);
     console.log(`📍 http://localhost:${PORT}\n`);
+    startScheduledTask();
 });

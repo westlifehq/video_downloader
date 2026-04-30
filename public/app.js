@@ -368,13 +368,14 @@ function addToHistory(item) {
     let history = JSON.parse(localStorage.getItem('dy_history') || '[]');
     history.unshift({
         title: item.fileName || item.info.title,
+        author: item.info ? item.info.author : '',
         fileName: item.fileName,
         filePath: item.filePath,
         fileSize: item.fileSize,
         cover: item.info ? item.info.cover : '',
         time: Date.now(),
     });
-    history = history.slice(0, 50);
+    history = history.slice(0, 200);
     localStorage.setItem('dy_history', JSON.stringify(history));
 }
 
@@ -382,6 +383,7 @@ function loadHistory() {
     const history = JSON.parse(localStorage.getItem('dy_history') || '[]');
     const section = document.getElementById('historySection');
     const list = document.getElementById('historyList');
+    const filtersEl = document.getElementById('historyFilters');
 
     if (history.length === 0) {
         section.style.display = 'none';
@@ -389,17 +391,50 @@ function loadHistory() {
     }
 
     section.style.display = 'block';
-    list.innerHTML = history.map((item, index) => {
+    filtersEl.style.display = history.length > 3 ? 'flex' : 'none';
+
+    // Populate author filter
+    const authorSelect = document.getElementById('historyFilterAuthor');
+    const currentAuthorVal = authorSelect.value;
+    const authors = [...new Set(history.map(h => h.author).filter(Boolean))];
+    authorSelect.innerHTML = '<option value="">全部作者</option>' + authors.map(a => `<option value="${a}"${a === currentAuthorVal ? ' selected' : ''}>@${a}</option>`).join('');
+
+    // Apply filters
+    const keyword = (document.getElementById('historyFilterKeyword').value || '').trim().toLowerCase();
+    const authorFilter = document.getElementById('historyFilterAuthor').value;
+    const dateFilter = document.getElementById('historyFilterDate').value;
+
+    const now = Date.now();
+    const filtered = history.filter(item => {
+        if (keyword && !(item.title || '').toLowerCase().includes(keyword) && !(item.author || '').toLowerCase().includes(keyword)) return false;
+        if (authorFilter && item.author !== authorFilter) return false;
+        if (dateFilter === 'today' && (now - item.time) > 86400000) return false;
+        if (dateFilter === 'week' && (now - item.time) > 7 * 86400000) return false;
+        if (dateFilter === 'month' && (now - item.time) > 30 * 86400000) return false;
+        return true;
+    });
+
+    if (filtered.length === 0) {
+        list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--c-text-muted);font-size:13px;">无匹配记录</div>';
+        return;
+    }
+
+    list.innerHTML = filtered.map((item, index) => {
+        const realIndex = history.indexOf(item);
         const placeholderHtml = `<div class="history-thumb-placeholder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg></div>`;
         const thumbHtml = item.cover
             ? `<img class="history-thumb" src="${item.cover}" alt="" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">` + `<div class="history-thumb-placeholder" style="display:none;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg></div>`
             : placeholderHtml;
+        const authorStr = item.author ? `<span style="font-size:11px;color:var(--c-text-muted);">@${item.author}</span>` : '';
+        const timeStr = item.time ? `<span style="font-size:11px;color:var(--c-text-muted);">${new Date(item.time).toLocaleString('zh-CN', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}</span>` : '';
         return `
       <div class="history-item">
         ${thumbHtml}
         <div class="history-info">
           <span class="history-name" title="${item.filePath || ''}">${item.title || item.fileName}</span>
           <div class="history-meta">
+            ${authorStr}
+            ${timeStr}
             <span class="history-status"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>Completed</span>
             <span class="history-size">${formatBytes(item.fileSize)}</span>
           </div>
@@ -410,7 +445,7 @@ function loadHistory() {
               <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
             </svg>
           </button>
-          <button class="action-btn action-btn--delete" onclick="deleteHistoryFile('${(item.filePath || '').replace(/\\/g, '\\\\')}', ${index})" title="从磁盘删除文件">
+          <button class="action-btn action-btn--delete" onclick="deleteHistoryFile('${(item.filePath || '').replace(/\\/g, '\\\\')}', ${realIndex})" title="从磁盘删除文件">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="3 6 5 6 21 6"></polyline>
               <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -420,6 +455,10 @@ function loadHistory() {
       </div>
     `;
     }).join('');
+}
+
+function applyHistoryFilter() {
+    loadHistory();
 }
 
 async function openHistoryFile(filePath) {
@@ -658,12 +697,13 @@ async function handleCookieSubmit() {
  */
 async function handleFavoritesSync() {
     const syncBtn = document.getElementById('favSyncBtn');
+    const maxCount = parseInt(document.getElementById('favMaxCount').value) || 50;
     try {
         syncBtn.classList.add('syncing');
         syncBtn.disabled = true;
         syncBtn.querySelector('span').textContent = '同步中...';
 
-        const result = await api('POST', '/api/favorites/sync', { maxCount: 50 });
+        const result = await api('POST', '/api/favorites/sync', { maxCount });
         if (result.taskId) {
             pollFavSync(result.taskId);
         }
@@ -1136,12 +1176,13 @@ function updateLikedUI(status) {
 
 async function handleLikedSync() {
     const syncBtn = document.getElementById('likedSyncBtn');
+    const maxCount = parseInt(document.getElementById('likedMaxCount').value) || 50;
     try {
         syncBtn.classList.add('syncing');
         syncBtn.disabled = true;
         syncBtn.querySelector('span').textContent = '同步中...';
 
-        const result = await api('POST', '/api/liked/sync', { maxCount: 50 });
+        const result = await api('POST', '/api/liked/sync', { maxCount });
         if (result.taskId) {
             pollLikedSync(result.taskId);
         }
@@ -1548,3 +1589,107 @@ async function downloadSelectedLikedItems() {
         await downloadLikedItem(idx);
     }
 }
+
+// ═══════════════════════════════════════════
+// 定时同步设置
+// ═══════════════════════════════════════════
+
+function toggleSchedulePanel() {
+    const panel = document.getElementById('schedulePanel');
+    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    if (panel.style.display === 'block') {
+        loadScheduleConfig();
+    }
+}
+
+async function loadScheduleConfig() {
+    try {
+        const cfg = await api('GET', '/api/schedule/config');
+        document.getElementById('scheduleEnabled').checked = cfg.enabled;
+        document.getElementById('scheduleSyncMode').value = cfg.syncMode || 'both';
+        document.getElementById('scheduleMaxCount').value = cfg.maxCount || 50;
+
+        // 将 cron 表达式转为 HH:MM 时间展示
+        // 默认 cron: "0 0 * * *" => 00:00
+        const cronParts = (cfg.cronTime || '0 0 * * *').split(' ');
+        const hour = (cronParts[1] || '0').padStart(2, '0');
+        const minute = (cronParts[0] || '0').padStart(2, '0');
+        document.getElementById('scheduleTime').value = `${hour}:${minute}`;
+
+        updateScheduleBadge(cfg.enabled);
+    } catch (err) {
+        console.error('加载定时配置失败:', err);
+    }
+}
+
+function updateScheduleBadge(enabled) {
+    const badge = document.getElementById('scheduleBadge');
+    const text = document.getElementById('scheduleStatusText');
+    if (enabled) {
+        badge.style.display = 'inline-flex';
+        text.textContent = '已启用';
+    } else {
+        badge.style.display = 'none';
+    }
+}
+
+async function saveScheduleConfig() {
+    const enabled = document.getElementById('scheduleEnabled').checked;
+    const timeVal = document.getElementById('scheduleTime').value || '00:00';
+    const syncMode = document.getElementById('scheduleSyncMode').value;
+    const maxCount = parseInt(document.getElementById('scheduleMaxCount').value) || 50;
+
+    // 将 HH:MM 转为 cron 表达式
+    const [hour, minute] = timeVal.split(':');
+    const cronTime = `${parseInt(minute)} ${parseInt(hour)} * * *`;
+
+    try {
+        const result = await api('POST', '/api/schedule/config', { enabled, cronTime, syncMode, maxCount });
+        updateScheduleBadge(enabled);
+        showToast('定时同步配置已保存', 'success');
+    } catch (err) {
+        showToast('保存失败: ' + err.message, 'error');
+    }
+}
+
+async function triggerScheduleNow() {
+    try {
+        await api('POST', '/api/schedule/run');
+        showToast('已触发定时同步，后台正在执行...', 'success');
+    } catch (err) {
+        showToast('触发失败: ' + err.message, 'error');
+    }
+}
+
+async function loadScheduleLogs() {
+    const logPanel = document.getElementById('scheduleLogPanel');
+    logPanel.style.display = 'block';
+    logPanel.innerHTML = '加载中...';
+    try {
+        const logs = await api('GET', '/api/schedule/logs');
+        if (!logs || logs.length === 0) {
+            logPanel.innerHTML = '<div style="text-align:center;padding:10px;">暂无执行记录</div>';
+            return;
+        }
+        logPanel.innerHTML = logs.map(log => {
+            const time = new Date(log.time).toLocaleString('zh-CN');
+            const modeLabel = { both: '收藏+喜欢', favorites: '仅收藏', liked: '仅喜欢' }[log.syncMode] || log.syncMode;
+            if (log.error) {
+                return `<div style="padding:6px 0;border-bottom:1px solid var(--c-border);">
+                    <span style="color:var(--c-error);">✕</span> ${time} [${modeLabel}] ${log.error}
+                </div>`;
+            }
+            const r = log.results || {};
+            return `<div style="padding:6px 0;border-bottom:1px solid var(--c-border);">
+                <span style="color:var(--c-success);">✓</span> ${time} [${modeLabel}] 发现${log.totalFound || 0}条 → 下载${log.toDownload || 0}条 (成功${r.success || 0} / 失败${r.fail || 0})
+            </div>`;
+        }).join('');
+    } catch (err) {
+        logPanel.innerHTML = `<div style="color:var(--c-error);">加载失败: ${err.message}</div>`;
+    }
+}
+
+// 页面加载时初始化定时同步状态
+document.addEventListener('DOMContentLoaded', () => {
+    loadScheduleConfig();
+});
