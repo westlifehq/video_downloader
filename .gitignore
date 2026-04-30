@@ -21,6 +21,18 @@ synced_ids.json
 *.exe
 douyin-downloader-mac
 
+# 排除项目内部笔记
+CURRENT_STATUS.md
+DECISIONS.md
+NEXT_STEPS.md
+PROJECT_CONTEXT.md
+WORKSPACE_RULES.md
+
+# 排除调试截图
+fav_debug.png
+public/fav_debug.png
+public/login_debug.png
+
 # 排除实验性杂碎文件
 test_*.js
 test-*.js

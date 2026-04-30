@@ -5,8 +5,8 @@ WORKDIR /app
 # 安装 Node.js 依赖所需的基础工具 (如有必要)
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
+# 注意：本 Dockerfile 从仓库根目录作为构建上下文（docker-compose 中 context: ..）
 COPY package*.json ./
-# 注意：在容器内我们使用 npm ci 安装依赖
 RUN npm ci --omit=dev
 
 # 拷贝代码

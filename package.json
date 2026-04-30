@@ -10,7 +10,6 @@
     "build-mac": "pkg . --targets node18-macos-x64 --output douyin-downloader-mac"
   },
   "dependencies": {
-    "@larksuite/cli": "^1.0.4",
     "axios": "^0.27.2",
     "express": "^4.21.0",
     "node-cron": "^4.2.1",

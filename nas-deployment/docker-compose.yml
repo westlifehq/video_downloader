@@ -1,6 +1,8 @@
 services:
   downloader:
-    build: .
+    build:
+      context: ..
+      dockerfile: nas-deployment/Dockerfile
     container_name: video-downloader
     restart: unless-stopped
     ports:

@@ -18,3 +18,15 @@ run.cmd
 run-downloader.cmd
 *.command
 .claude
+nas-deployment
+test-*.js
+test_*.js
+fav_debug.png
+public/fav_debug.png
+public/login_debug.png
+douyin_session.json
+liked_ids.json
+synced_ids.json
+schedule_config.json
+schedule_log.json
+user_data
