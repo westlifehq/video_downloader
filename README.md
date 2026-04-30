@@ -10,6 +10,9 @@
 ## 🌟 核心特性
 
 - **高级收藏夹同步 (v2.1)**：支持扫码登录后自动同步收藏视频。新增 **「同步打断」** 机制（加载过慢时可随时结算并停止滚动）以及 **「多选批量下载」** 模式（支持一键勾选未下载视频进行并发下载）。
+- **新增喜欢视频同步**：在现有收藏同步之外，新增 **「同步喜欢」** 入口，支持抓取抖音账号喜欢的视频列表，并提供单条下载、批量下载、多选下载、已下载折叠查看等能力。
+- **Cookie 直登优化**：前端手动注入 `sessionid` 时不再依赖 Playwright 浏览器启动，网页内即可直接完成凭证绑定，避免因浏览器内核未安装导致登录失败。
+- **Windows 一键启动修复**：`run.cmd` 与 `run-downloader.cmd` 现已支持自动回退到 Node.js 模式，并在首次运行时自动安装 npm 依赖与 Playwright Chromium。
 - **物理文件双向同步**：支持在下载历史和收藏面板直接「打开文件位置」或「从磁盘物理删除」，实现下载状态与本地文件的实时对齐。
 - **跨平台解析**：支持 **抖音 (Douyin)** 和 **小红书 (Xiaohongshu)** 视频内容解析，自动识别平台并切换引擎。
 - **无水印原画质**：直取底层接口，下载官方无压缩、无水印的 1080P/720P 原视频。
@@ -45,19 +48,26 @@ cd video_downloader
 npm install
 ```
 
-3. 本地启动服务（Mac 用户可直接双击项目中的 `启动抖音下载器.command`）
+3. 本地启动服务（Windows 可直接双击 `run-downloader.cmd`，Mac 用户可直接双击项目中的 `启动抖音下载器.command`）
 ```bash
 npm run dev
 # 或直接执行 node server.js
 ```
 
+Windows 启动脚本会自动处理以下事项：
+- 检测 Node.js 是否存在
+- 首次运行时自动执行 `npm install`
+- 首次运行时自动执行 `npx playwright install chromium`
+
 4. 自动打开浏览器体验
 服务启动后，浏览器会自动运行或手动访问 [http://localhost:3000](http://localhost:3000) 。
 
-5. **抖音收藏同步使用说明**：
-   - 首次使用「常用功能 -> 同步收藏」需扫码登录。
-   - 登录信息保存在本地 `user_data/` 目录，不会上传服务器。
-   - 依赖 Playwright 浏览器引擎。若环境未就绪，请运行 `npx playwright install chromium`。
+5. **抖音收藏 / 喜欢同步使用说明**：
+   - 收藏同步与喜欢同步共用同一套抖音登录态。
+   - 前端支持直接粘贴 `sessionid` 完成 Cookie 绑定，无需先启动浏览器。
+   - 首次进行「同步收藏」或「同步喜欢」时，程序会自动调用 Playwright Chromium 抓取网页版列表。
+   - 登录信息保存在本地 `douyin_session.json` 与 `user_data/` 目录，不会上传服务器。
+   - 已下载状态会分别持久化到 `synced_ids.json` 与 `liked_ids.json`。
 
 ---
 
@@ -91,10 +101,19 @@ npm run build-mac
 * 自带 `Dockerfile` 与 `docker-compose.yml`，支持一键构建与启动
 * 推荐配合飞牛 (FN OS) 的原生 Docker 运行 DDNSTO 进行内网穿透
 * 新增通过环境变量 `DOWNLOAD_DIR` 灵活映射物理下载路径
+* 已兼容收藏同步与喜欢同步，容器内基于官方 Playwright 镜像运行，无需额外安装浏览器依赖
+* `douyin_session.json`、`synced_ids.json`、`liked_ids.json` 与 `user_data/` 均可通过卷挂载持久化，便于飞牛 OS 重启后继续使用
 * 前端 UI 专门对移动端浏览器（如 Safari、夸克、UC 等）增加了 **「保存到手机」** 的 HTTP 直接下载适配，自动处理文件名中文乱码与特殊浏览器格式限制问题。
 
 **使用方法：**
 进入 `nas-deployment` 目录，通过 `docker build` 或 `docker-compose up -d` 即可部署。该目录不会影响根目录的本地 PC 版使用体验。
+
+`nas-deployment/docker-compose.yml` 默认已示例挂载以下数据：
+* 下载目录
+* 抖音登录凭证文件 `douyin_session.json`
+* 收藏下载状态文件 `synced_ids.json`
+* 喜欢下载状态文件 `liked_ids.json`
+* Playwright 持久化目录 `user_data/`
 
 ---
 

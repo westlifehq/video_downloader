@@ -125,6 +125,34 @@
         </div>
     </section>
 
+    <!-- 喜欢同步 -->
+    <section class="favorites-section" id="likedSection">
+      <div class="favorites-header">
+        <div class="favorites-title">
+          <svg class="fav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+          </svg>
+          <span>抖音喜欢同步</span>
+          <span class="fav-account-badge" id="likedAccountBadge" style="display:none">
+            <span class="badge-dot"></span>
+            <span id="likedAccountText">已登录</span>
+          </span>
+        </div>
+        <div class="favorites-actions">
+          <button class="btn btn--sync" id="likedSyncBtn" onclick="handleLikedSync()" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+              <polyline points="23 4 23 10 17 10"/>
+              <polyline points="1 20 1 14 7 14"/>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+            </svg>
+            <span>同步喜欢</span>
+          </button>
+        </div>
+      </div>
+      <!-- 同步进度面板 -->
+      <div id="likedSyncPanel" class="fav-sync-panel" style="display:none"></div>
+    </section>
+
     <!-- 解析结果列表容器 -->
     <div id="resultsContainer" class="results-container"></div>
 

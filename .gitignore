@@ -2,6 +2,10 @@ node_modules/
 .DS_Store
 *.log
 config.json
+douyin_session.json
+liked_ids.json
+public/fav_debug.png
+public/login_debug.png
 douyin-downloader.exe
 douyin-downloader-mac
 *.apk
