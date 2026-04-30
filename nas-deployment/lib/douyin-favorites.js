@@ -564,6 +564,223 @@ function saveLikedIds(newIds) {
   return updated;
 }
 
+
+// ═══════════════════════════════════════════
+// 私信视频提取
+// ═══════════════════════════════════════════
+
+async function fetchMessageVideos(maxCount = 50, onProgress, checkInterrupt) {
+    const chromiumInstance = getChromium();
+
+    const loggedIn = checkLoginStatus();
+    if (!loggedIn || !loggedIn.loggedIn) {
+        throw new Error('未登录或 Cookie 已失效，请先绑定凭证');
+    }
+
+    const isDocker = fs.existsSync('/.dockerenv') || process.env.IS_DOCKER === 'true';
+    const headless = isDocker || process.env.HEADLESS === 'true';
+
+    const launchOptions = {
+        headless: headless,
+        viewport: { width: 1280, height: 800 },
+        userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        args: [
+            '--disable-blink-features=AutomationControlled',
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-infobars',
+            '--ignore-certificate-errors',
+        ],
+        ignoreDefaultArgs: ['--enable-automation'],
+        locale: 'zh-CN',
+    };
+
+    const context = await chromiumInstance.launchPersistentContext(USER_DATA_DIR, launchOptions);
+
+    // 注入 Cookie
+    if (fs.existsSync(COOKIE_PATH)) {
+        try {
+            const cookieData = JSON.parse(fs.readFileSync(COOKIE_PATH, 'utf8'));
+            const sid = cookieData.sessionid;
+            if (sid) {
+                const cookieNames = ['sessionid', 'sessionid_ss', 'sid_guard', 'sid_tt'];
+                await context.addCookies(cookieNames.map(name => ({
+                    name, value: sid, domain: '.douyin.com', path: '/'
+                })));
+                console.log('[私信同步] 已注入 cookie');
+            }
+        } catch (e) {
+            console.error('[私信同步] 读取 cookie 文件失败:', e.message);
+        }
+    }
+
+    const page = await context.newPage();
+
+    await page.addInitScript(() => {
+        Object.defineProperty(navigator, 'webdriver', { get: () => false });
+    });
+
+    // 收集到的视频 ID 集合（去重用）
+    const collectedAwemeIds = new Set();
+    const collectedItems = [];
+
+    // 拦截 API 响应，提取 aweme_id
+    page.on('response', async (response) => {
+        try {
+            const url = response.url();
+            // 监控视频详情API和IM相关API
+            if (!url.includes('/web/im/') && !url.includes('/aweme/') && !url.includes('/multi/aweme/')) return;
+
+            const contentType = response.headers()['content-type'] || '';
+            if (!contentType.includes('json')) return;
+
+            const text = await response.text();
+            if (text.length < 100) return;
+
+            // 提取 aweme_id
+            const awemeMatches = text.match(/"aweme_id"\s*:\s*"(\d{15,})"/g);
+            if (!awemeMatches) return;
+
+            for (const match of awemeMatches) {
+                if (collectedItems.length >= maxCount) break;
+                if (checkInterrupt && checkInterrupt()) break;
+
+                const idMatch = match.match(/"aweme_id"\s*:\s*"(\d+)"/);
+                if (!idMatch) continue;
+                const id = idMatch[1];
+                if (collectedAwemeIds.has(id)) continue;
+                collectedAwemeIds.add(id);
+
+                collectedItems.push({
+                    _source: 'message',
+                    _refType: 'aweme_id',
+                    _refValue: id,
+                });
+
+                if (onProgress) {
+                    onProgress({ phase: '正在从私信中提取视频...', collected: collectedItems.length });
+                }
+            }
+        } catch (err) { /* ignore */ }
+    });
+
+    try {
+        if (onProgress) onProgress({ phase: '正在打开私信页面...', collected: 0 });
+
+        // 使用正确的私信页面 URL
+        await page.goto('https://www.douyin.com/chat?isPopup=1', {
+            waitUntil: 'domcontentloaded',
+            timeout: 30000,
+        });
+
+        await page.waitForTimeout(5000);
+
+        // 等待会话列表加载
+        try {
+            await page.waitForSelector('[class*="ConversationList"], [class*="conversationList"]', { timeout: 10000 });
+            console.log('[私信同步] 会话列表已加载');
+        } catch {
+            console.log('[私信同步] 等待会话列表超时，尝试继续...');
+        }
+
+        if (onProgress) onProgress({ phase: '正在扫描会话列表...', collected: collectedItems.length });
+
+        // 获取会话项
+        let conversationItems = await page.$$('[class*="ConversationItem"]');
+        if (conversationItems.length === 0) {
+            // 备用选择器
+            conversationItems = await page.$$('[class*="conversationItem"], [class*="conversation-item"]');
+        }
+
+        const maxConversations = Math.min(conversationItems.length, 20);
+        console.log('[私信同步] 发现 ' + conversationItems.length + ' 个会话，将扫描前 ' + maxConversations + ' 个');
+
+        for (let i = 0; i < maxConversations; i++) {
+            if (collectedItems.length >= maxCount) break;
+            if (checkInterrupt && checkInterrupt()) break;
+
+            if (onProgress) {
+                onProgress({ phase: '正在扫描第 ' + (i + 1) + '/' + maxConversations + ' 个会话...', collected: collectedItems.length });
+            }
+
+            try {
+                // 重新获取会话项（DOM 可能因虚拟滚动变化）
+                let items = await page.$$('[class*="ConversationItem"]');
+                if (items.length === 0) items = await page.$$('[class*="conversationItem"]');
+                if (i >= items.length) break;
+
+                // 检查元素是否可见，跳过不可见的虚拟列表项
+                const isVisible = await items[i].isVisible();
+                if (!isVisible) {
+                    console.log('[私信同步] 跳过不可见的会话 #' + (i + 1));
+                    continue;
+                }
+
+                await items[i].click({ timeout: 5000 });
+                await page.waitForTimeout(3000);
+
+                // 在消息区域滚动加载更多历史消息
+                const messageArea = await page.$('[class*="MessageList"], [class*="messageList"]');
+                if (messageArea) {
+                    for (let scroll = 0; scroll < 3; scroll++) {
+                        if (collectedItems.length >= maxCount) break;
+                        if (checkInterrupt && checkInterrupt()) break;
+                        await messageArea.evaluate(el => { el.scrollTop = 0; });
+                        await page.waitForTimeout(2000);
+                    }
+                }
+            } catch (err) {
+                console.error('[私信同步] 扫描第 ' + (i + 1) + ' 个会话时出错:', err.message);
+                continue;
+            }
+        }
+
+        if (onProgress) {
+            onProgress({ phase: '扫描完成，正在解析视频信息...', collected: collectedItems.length });
+        }
+    } finally {
+        try { await context.close(); } catch (e) { }
+    }
+
+    // 解析每个提取到的引用为完整视频信息
+    const douyinLib = require('./douyin');
+    const resolvedItems = [];
+
+    for (let i = 0; i < collectedItems.length; i++) {
+        if (checkInterrupt && checkInterrupt()) break;
+
+        const ref = collectedItems[i];
+        if (onProgress) {
+            onProgress({ phase: '正在解析视频 ' + (i + 1) + '/' + collectedItems.length + '...', collected: resolvedItems.length });
+        }
+
+        try {
+            let videoInfo;
+            if (ref._refType === 'aweme_id') {
+                videoInfo = await douyinLib.fetchVideoInfo(ref._refValue);
+            } else if (ref._refType === 'share_url') {
+                const resolved = await douyinLib.resolveShareUrl(ref._refValue);
+                if (resolved) {
+                    const vid = douyinLib.extractVideoId(resolved);
+                    if (vid) videoInfo = await douyinLib.fetchVideoInfo(vid);
+                }
+            }
+
+            if (videoInfo) {
+                resolvedItems.push(videoInfo);
+            }
+        } catch (err) {
+            console.error('[私信同步] 解析视频引用失败 [' + ref._refType + ': ' + ref._refValue + ']:', err.message);
+        }
+
+        // 避免请求过快触发风控
+        await new Promise(r => setTimeout(r, 500));
+    }
+
+    console.log('[私信同步] 完成，共解析 ' + resolvedItems.length + ' 个视频');
+    return resolvedItems;
+}
+
 module.exports = {
   checkLoginStatus,
   openLoginBrowser,
@@ -576,4 +793,5 @@ module.exports = {
   getLikedData,
   saveLikedIds,
   loginWithCookie,
+  fetchMessageVideos,
 };

@@ -673,6 +673,139 @@ app.get('/api/liked/sync/:taskId', (req, res) => {
     res.json(task);
 });
 
+
+// ═══════════════════════════════════════════
+// 私信同步 API
+// ═══════════════════════════════════════════
+
+const msgSyncTasks = new Map();
+
+/**
+ * POST /api/messages/sync — 开始私信视频同步
+ */
+app.post('/api/messages/sync', async (req, res) => {
+    const maxCount = req.body.maxCount || 50;
+
+    // 检查是否已有同步任务在进行
+    for (const task of msgSyncTasks.values()) {
+        if (task.status === 'fetching') {
+            return res.status(409).json({ error: '已有同步任务进行中', taskId: task.id });
+        }
+    }
+
+    const taskId = uuidv4();
+    const task = {
+        id: taskId,
+        status: 'fetching',
+        phase: '正在初始化...',
+        collected: 0,
+        maxCount,
+        items: [],
+        error: null,
+        startTime: Date.now(),
+        interrupted: false,
+    };
+    msgSyncTasks.set(taskId, task);
+
+    res.json({ success: true, taskId });
+
+    try {
+        const rawItems = await favorites.fetchMessageVideos(maxCount, (progress) => {
+            task.phase = progress.phase;
+            task.collected = progress.collected;
+        }, () => task.interrupted);
+
+        if (rawItems.length === 0) {
+            task.status = 'done';
+            task.phase = '未在私信中发现视频';
+            return;
+        }
+
+        const downloadDir = getEffectiveDownloadDir();
+
+        for (const rawItem of rawItems) {
+            try {
+                // fetchMessageVideos 返回的已经是 normalizeVideoData 处理后的数据
+                const info = rawItem;
+                const awemeId = info.awemeId || '';
+                const isImage = info.type === 'image';
+                const safeName = douyin.sanitizeFilename(info.title || awemeId || 'douyin');
+                const fileName = isImage
+                    ? `[图集]_${safeName}`
+                    : `${safeName}_${awemeId || Date.now()}.mp4`;
+                const savePath = path.join(downloadDir, fileName);
+                const alreadyDownloaded = fs.existsSync(savePath);
+
+                task.items.push({
+                    type: info.type,
+                    videoUrl: info.videoUrl,
+                    images: info.images,
+                    title: info.title,
+                    author: info.author,
+                    cover: info.cover,
+                    awemeId,
+                    duration: info.duration,
+                    width: info.width,
+                    height: info.height,
+                    platform: 'douyin',
+                    alreadyDownloaded,
+                    fileName,
+                    filePath: savePath,
+                });
+            } catch (err) {
+                task.items.push({
+                    title: rawItem.title || '未知',
+                    awemeId: rawItem.awemeId || '',
+                    cover: '',
+                    parseError: err.message,
+                    alreadyDownloaded: false,
+                });
+            }
+        }
+
+        task.status = 'done';
+        task.phase = task.interrupted ? `已打断，获取到 ${task.items.length} 条私信视频` : `已获取 ${task.items.length} 条私信视频`;
+        console.log(`[私信同步] ${task.phase}`);
+    } catch (err) {
+        task.status = 'error';
+        task.error = err.message;
+        task.phase = '获取私信视频列表失败';
+        console.error(`[私信同步] 错误: ${err.message}`);
+    }
+});
+
+/**
+ * POST /api/messages/sync/stop — 打断私信同步任务
+ */
+app.post('/api/messages/sync/stop', (req, res) => {
+    const { taskId } = req.body;
+    if (!taskId) return res.status(400).json({ error: '未提供 taskId' });
+    
+    const task = msgSyncTasks.get(taskId);
+    if (!task) {
+        return res.status(404).json({ error: '任务不存在' });
+    }
+    
+    if (task.status === 'fetching') {
+        task.interrupted = true;
+        console.log(`[私信同步] 接收到打断信号 taskId=${taskId}`);
+        return res.json({ success: true, message: '打断信号已发送' });
+    }
+    
+    res.json({ success: false, message: '任务不在获取阶段，无法打断' });
+});
+
+/**
+ * GET /api/messages/sync/:taskId — 查询私信同步任务进度
+ */
+app.get('/api/messages/sync/:taskId', (req, res) => {
+    const task = msgSyncTasks.get(req.params.taskId);
+    if (!task) {
+        return res.status(404).json({ error: '任务不存在' });
+    }
+    res.json(task);
+});
+
 // ═══════════════════════════════════════════
 // 定时同步 & 下载
 // ═══════════════════════════════════════════

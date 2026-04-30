@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadHistory();
     loadFavStatus();
     loadLikedStatus();
+    loadMsgStatus();
     loadScheduleConfig();
 
     document.getElementById('urlInput').addEventListener('keydown', (e) => {
@@ -33,7 +34,7 @@ function switchSyncTab(tab) {
     document.querySelectorAll('.sync-tab').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.sync-tab-content').forEach(el => el.classList.remove('active'));
     document.querySelector(`.sync-tab[data-tab="${tab}"]`).classList.add('active');
-    const tabMap = { fav: 'tabFav', liked: 'tabLiked', schedule: 'tabSchedule', auth: 'tabAuth' };
+    const tabMap = { fav: 'tabFav', liked: 'tabLiked', messages: 'tabMessages', schedule: 'tabSchedule', auth: 'tabAuth' };
     document.getElementById(tabMap[tab]).classList.add('active');
 }
 
@@ -1578,6 +1579,459 @@ async function downloadSelectedLikedItems() {
         const ds = likedDownloadStates[item.awemeId];
         if (ds && (ds.status === 'downloading' || ds.status === 'done')) continue;
         await downloadLikedItem(idx);
+    }
+}
+
+// ═══════════════════════════════════════════
+// 私信同步
+// ═══════════════════════════════════════════
+
+let msgSyncPollTimer = null;
+let msgSyncedItems = [];
+let msgDownloadStates = {};
+let isMsgMultiSelectMode = false;
+let msgSelectedItems = new Set();
+let msgDownloadedExpanded = false;
+
+async function stopMsgSync(taskId) {
+    if(!confirm('确定要打断当前同步并结算已抓取的数据吗？')) return;
+    try {
+        await api('POST', '/api/messages/sync/stop', { taskId });
+        showToast('已发送打断信号，请稍候...', 'info');
+    } catch (err) {
+        showToast('打断失败: ' + err.message, 'error');
+    }
+}
+
+async function loadMsgStatus() {
+    try {
+        const status = await api('GET', '/api/favorites/status');
+        updateMsgUI(status);
+    } catch (err) {
+        console.error('加载私信状态失败:', err);
+    }
+}
+
+function updateMsgUI(status) {
+    const syncBtn = document.getElementById('msgSyncBtn');
+    if (syncBtn) {
+        syncBtn.disabled = !status.loggedIn;
+    }
+}
+
+async function handleMsgSync() {
+    const syncBtn = document.getElementById('msgSyncBtn');
+    const maxCount = parseInt(document.getElementById('msgMaxCount').value) || 50;
+    try {
+        syncBtn.classList.add('syncing');
+        syncBtn.disabled = true;
+        syncBtn.querySelector('.btn-label').textContent = '同步中 . . .';
+
+        const result = await api('POST', '/api/messages/sync', { maxCount });
+        if (result.taskId) {
+            pollMsgSync(result.taskId);
+        }
+    } catch (err) {
+        if (err.message.includes('已有同步任务')) {
+            showToast('已有同步任务在进行中', 'error');
+        } else if (err.message.includes('未登录') || err.message.includes('失效')) {
+            showToast('登录态已失效，请先在凭证页面登录', 'error');
+        } else {
+            showToast('同步失败: ' + err.message, 'error');
+        }
+        syncBtn.classList.remove('syncing');
+        syncBtn.disabled = false;
+        syncBtn.querySelector('.btn-label').textContent = '同步私信';
+    }
+}
+
+function pollMsgSync(taskId) {
+    const panel = document.getElementById('msgSyncPanel');
+    panel.style.display = 'block';
+
+    if (msgSyncPollTimer) clearInterval(msgSyncPollTimer);
+
+    msgSyncPollTimer = setInterval(async () => {
+        try {
+            const task = await api('GET', `/api/messages/sync/${taskId}`);
+
+            if (task.status === 'fetching') {
+                panel.innerHTML = `
+                    <div class="fav-sync-header">
+                        <div>
+                            <span class="fav-sync-phase">${task.phase || '正在扫描私信...'}</span>
+                            <span class="fav-sync-counter" style="margin-left:8px">已发现 ${task.collected || 0} 条</span>
+                        </div>
+                        <button class="btn btn--stop" style="padding:4px 10px;font-size:11px;border-radius:6px;color:white;border:none;cursor:pointer;" onclick="stopMsgSync('${taskId}')">停止打断</button>
+                    </div>
+                    <div class="fav-sync-progress">
+                        <div class="fav-sync-progress-fill indeterminate" style="width:30%"></div>
+                    </div>
+                `;
+            } else if (task.status === 'done' || task.status === 'error') {
+                clearInterval(msgSyncPollTimer);
+                msgSyncPollTimer = null;
+
+                const syncBtn = document.getElementById('msgSyncBtn');
+                syncBtn.classList.remove('syncing');
+                syncBtn.disabled = false;
+                syncBtn.querySelector('.btn-label').textContent = '同步私信';
+                loadMsgStatus();
+
+                if (task.status === 'error') {
+                    panel.innerHTML = `<div class="fav-login-hint" style="color:var(--c-error)">❌ ${task.error || '获取失败'}</div>`;
+                    showToast('获取私信视频列表失败', 'error');
+                } else {
+                    msgSyncedItems = task.items || [];
+                    msgDownloadStates = {};
+                    renderMsgList();
+                    const newCount = msgSyncedItems.filter(i => !i.alreadyDownloaded && !i.parseError).length;
+                    showToast(`已获取 ${task.items.length} 条私信视频，${newCount} 条未下载`, 'success');
+                }
+            }
+        } catch (err) {
+            console.error('轮询私信同步进度失败:', err);
+        }
+    }, 1000);
+}
+
+function renderMsgList() {
+    const panel = document.getElementById('msgSyncPanel');
+    if (!msgSyncedItems || msgSyncedItems.length === 0) {
+        panel.innerHTML = '<div class="fav-login-hint">未在私信中发现视频链接</div>';
+        return;
+    }
+
+    const undownloaded = [];
+    const downloaded = [];
+    const errored = [];
+
+    msgSyncedItems.forEach((item, idx) => {
+        item._idx = idx;
+        if (item.parseError) {
+            errored.push(item);
+        } else {
+            const ds = msgDownloadStates[item.awemeId];
+            const isDone = item.alreadyDownloaded || (ds && ds.status === 'done');
+            if (isDone) {
+                downloaded.push(item);
+            } else {
+                undownloaded.push(item);
+            }
+        }
+    });
+
+    let html = '';
+
+    if (isMsgMultiSelectMode) {
+        html += `<div class="multi-select-bar">
+            <span style="font-size:13px;font-weight:600;color:var(--c-primary)">已选 ${msgSelectedItems.size} 项</span>
+            <div class="multi-select-actions">
+                <button class="btn btn--secondary" style="padding:5px 10px;font-size:12px;border-radius:6px" onclick="msgSelectAllUndownloaded()">全选未下载</button>
+                <button class="btn btn--secondary" style="padding:5px 10px;font-size:12px;border-radius:6px" onclick="toggleMsgMultiSelectMode()">取消</button>
+                <button class="btn btn--sync" style="padding:5px 12px;font-size:12px;border-radius:6px" onclick="downloadSelectedMsgItems()" ${msgSelectedItems.size === 0 ? 'disabled' : ''}>下载所选</button>
+            </div>
+        </div>`;
+    }
+
+    html += `<div class="fav-group" style="${isMsgMultiSelectMode ? 'opacity:0.9' : ''}">
+        <div class="fav-sync-header" style="margin-bottom:10px">
+            <span class="fav-sync-phase">📥 未下载 (${undownloaded.length})</span>
+            ${(!isMsgMultiSelectMode && msgSyncedItems.length > 0) ? `
+            <div style="display:flex;gap:8px;">
+                <button class="btn btn--secondary" onclick="toggleMsgMultiSelectMode()" style="padding:5px 12px;font-size:12px;border-radius:6px">多选</button>
+                ${undownloaded.length > 0 ? `<button class="btn btn--sync" onclick="downloadAllMsgItems()" style="padding:5px 12px;font-size:12px;border-radius:6px">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    <span>全部下载</span>
+                </button>` : ''}
+            </div>` : ''}
+        </div>`;
+
+    if (undownloaded.length === 0) {
+        html += '<div style="padding:12px 0;text-align:center;color:var(--c-text-muted);font-size:13px">🎉 全部已下载</div>';
+    } else {
+        html += '<div class="fav-sync-items">';
+        html += undownloaded.map(item => renderMsgItemCard(item, false)).join('');
+        html += '</div>';
+    }
+    html += '</div>';
+
+    if (downloaded.length > 0) {
+        html += `<div class="fav-group" style="margin-top:16px">
+            <div class="fav-sync-header fav-downloaded-toggle" onclick="toggleMsgDownloadedList()" style="cursor:pointer;margin-bottom:${msgDownloadedExpanded ? '10' : '0'}px">
+                <span class="fav-sync-phase" style="display:flex;align-items:center;gap:6px">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"
+                         style="transition:transform 0.2s;transform:rotate(${msgDownloadedExpanded ? '90' : '0'}deg)">
+                        <polyline points="9 18 15 12 9 6"/>
+                    </svg>
+                    ✅ 已下载 (${downloaded.length})
+                </span>
+                <span class="fav-sync-counter" style="font-size:11px;color:var(--c-text-muted)">点击${msgDownloadedExpanded ? '收起' : '展开'}</span>
+            </div>`;
+
+        if (msgDownloadedExpanded) {
+            html += '<div class="fav-sync-items">';
+            html += downloaded.map(item => renderMsgItemCard(item, true)).join('');
+            html += '</div>';
+        }
+        html += '</div>';
+    }
+
+    if (errored.length > 0) {
+        html += '<div style="margin-top:12px">';
+        html += errored.map(item => `<div class="fav-sync-item" style="opacity:0.5;padding:6px 12px">
+            <svg class="fav-sync-item-status error" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            <span class="fav-sync-item-title">${item.title} (解析失败)</span>
+        </div>`).join('');
+        html += '</div>';
+    }
+
+    panel.innerHTML = html;
+}
+
+function renderMsgItemCard(item, isDownloadedSection) {
+    const idx = item._idx;
+    const coverHtml = item.cover
+        ? `<img src="${item.cover}" style="width:40px;height:40px;border-radius:6px;object-fit:cover;flex-shrink:0" onerror="this.style.display='none'">`
+        : '';
+
+    const dState = msgDownloadStates[item.awemeId];
+    const isDownloading = dState && dState.status === 'downloading';
+    const isDownloaded = item.alreadyDownloaded || (dState && dState.status === 'done');
+    const isError = dState && dState.status === 'error';
+
+    let actionHtml = '';
+
+    if (isDownloading) {
+        const progress = dState.progress || 0;
+        actionHtml = `<div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+            <div style="width:60px;height:4px;background:var(--c-border);border-radius:2px;overflow:hidden">
+                <div style="width:${progress}%;height:100%;background:linear-gradient(90deg,var(--c-primary),var(--c-accent));border-radius:2px;transition:width 0.3s"></div>
+            </div>
+            <span style="font-size:11px;color:var(--c-primary);font-family:var(--font-mono);white-space:nowrap">${progress}%</span>
+        </div>`;
+    } else if (isDownloadedSection && isDownloaded) {
+        actionHtml = `<div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+            <button class="btn btn--primary" style="padding:4px 10px;font-size:11px;border-radius:6px;opacity:0.7" onclick="redownloadMsgItem(${idx})" title="重新下载">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+                    <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                </svg>
+            </button>
+            <button class="action-btn action-btn--open" style="opacity:1" onclick="openMsgFile(${idx})" title="打开文件夹">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                </svg>
+            </button>
+            <button class="action-btn action-btn--delete" style="opacity:1" onclick="deleteMsgFile(${idx})" title="删除文件">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6"/>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                </svg>
+            </button>
+        </div>`;
+    } else if (!isDownloaded) {
+        actionHtml = `<button class="btn btn--primary" style="padding:5px 14px;font-size:12px;border-radius:8px;white-space:nowrap;flex-shrink:0" onclick="downloadMsgItem(${idx})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            <span>下载</span>
+        </button>`;
+    }
+
+    if (isError && !isDownloaded) {
+        actionHtml = `<div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+            <span style="font-size:11px;color:var(--c-error)">失败</span>
+            <button class="btn btn--primary" style="padding:4px 10px;font-size:11px;border-radius:6px" onclick="downloadMsgItem(${idx})">重试</button>
+        </div>`;
+    }
+
+    const authorHtml = item.author ? `<span style="font-size:11px;color:var(--c-text-muted)">@${item.author}</span>` : '';
+
+    const isSelected = msgSelectedItems.has(idx);
+    const checkboxHtml = isMsgMultiSelectMode ? `
+        <div class="fav-checkbox-wrap">
+            <input type="checkbox" class="fav-checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); toggleMsgItemSelection(${idx})" />
+        </div>
+    ` : '';
+
+    if (isMsgMultiSelectMode) {
+        actionHtml = '';
+    }
+
+    return `<div class="fav-sync-item ${isSelected ? 'selected' : ''}" style="padding:10px 12px;gap:10px;${isMsgMultiSelectMode ? 'cursor:pointer;' : ''}" ${isMsgMultiSelectMode ? `onclick="toggleMsgItemSelection(${idx})"` : ''}>
+        ${checkboxHtml}
+        ${coverHtml}
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+            <span class="fav-sync-item-title" title="${item.title}">${item.title}</span>
+            ${authorHtml}
+        </div>
+        ${actionHtml}
+    </div>`;
+}
+
+function toggleMsgDownloadedList() {
+    msgDownloadedExpanded = !msgDownloadedExpanded;
+    renderMsgList();
+}
+
+async function downloadMsgItem(idx) {
+    const item = msgSyncedItems[idx];
+    if (!item) return;
+
+    const awemeId = item.awemeId;
+    if (msgDownloadStates[awemeId] && msgDownloadStates[awemeId].status === 'downloading') return;
+
+    item.alreadyDownloaded = false;
+    msgDownloadStates[awemeId] = { status: 'downloading', progress: 0 };
+    renderMsgList();
+
+    try {
+        const result = await api('POST', '/api/download', {
+            type: item.type,
+            videoUrl: item.videoUrl,
+            images: item.images,
+            title: item.title,
+            awemeId: item.awemeId,
+            platform: item.platform || 'douyin',
+        });
+        if (!result.taskId) throw new Error('No taskId');
+
+        const pollId = setInterval(async () => {
+            try {
+                const task = await api('GET', `/api/download/${result.taskId}`);
+                msgDownloadStates[awemeId].progress = task.progress || 0;
+
+                if (task.status === 'done') {
+                    clearInterval(pollId);
+                    msgDownloadStates[awemeId] = { status: 'done', filePath: task.filePath, fileName: task.fileName, fileSize: task.fileSize };
+                    item.alreadyDownloaded = true;
+                    renderMsgList();
+                    addToHistory({
+                        fileName: task.fileName,
+                        filePath: task.filePath,
+                        fileSize: task.fileSize,
+                        info: { title: item.title, cover: item.cover, type: item.type },
+                    });
+                    loadHistory();
+                } else if (task.status === 'error') {
+                    clearInterval(pollId);
+                    msgDownloadStates[awemeId].status = 'error';
+                    renderMsgList();
+                    showToast(`下载失败: ${task.error || '未知错误'}`, 'error');
+                } else {
+                    renderMsgList();
+                }
+            } catch (e) { /* ignore */ }
+        }, 500);
+    } catch (err) {
+        msgDownloadStates[awemeId].status = 'error';
+        renderMsgList();
+        showToast('下载请求失败: ' + err.message, 'error');
+    }
+}
+
+async function redownloadMsgItem(idx) {
+    const item = msgSyncedItems[idx];
+    if (!item) return;
+    item.alreadyDownloaded = false;
+    delete msgDownloadStates[item.awemeId];
+    await downloadMsgItem(idx);
+}
+
+async function openMsgFile(idx) {
+    const item = msgSyncedItems[idx];
+    if (!item) return;
+    const ds = msgDownloadStates[item.awemeId];
+    const fp = (ds && ds.filePath) || item.filePath;
+    if (fp) {
+        await openHistoryFile(fp);
+    } else {
+        showToast('未找到本地文件路径', 'info');
+    }
+}
+
+async function deleteMsgFile(idx) {
+    const item = msgSyncedItems[idx];
+    if (!item) return;
+    const ds = msgDownloadStates[item.awemeId];
+    const fp = (ds && ds.filePath) || item.filePath;
+    if (!fp) {
+        showToast('未找到本地文件路径', 'info');
+        return;
+    }
+    if (!confirm(`确定删除文件？\n${fp}`)) return;
+    try {
+        await api('POST', '/api/history/delete', { filePath: fp });
+        showToast('文件已删除', 'success');
+        let history = JSON.parse(localStorage.getItem('dy_history') || '[]');
+        history = history.filter(h => h.filePath !== fp);
+        localStorage.setItem('dy_history', JSON.stringify(history));
+        loadHistory();
+    } catch (err) {
+        if (err.message.includes('不存在')) {
+            showToast('文件已经不存在了', 'info');
+        } else {
+            showToast('删除失败: ' + err.message, 'error');
+            return;
+        }
+    }
+    item.alreadyDownloaded = false;
+    delete msgDownloadStates[item.awemeId];
+    renderMsgList();
+}
+
+async function downloadAllMsgItems() {
+    for (let i = 0; i < msgSyncedItems.length; i++) {
+        const item = msgSyncedItems[i];
+        if (item.alreadyDownloaded || item.parseError) continue;
+        const ds = msgDownloadStates[item.awemeId];
+        if (ds && (ds.status === 'downloading' || ds.status === 'done')) continue;
+        await downloadMsgItem(i);
+    }
+}
+
+function toggleMsgMultiSelectMode() {
+    isMsgMultiSelectMode = !isMsgMultiSelectMode;
+    if (!isMsgMultiSelectMode) {
+        msgSelectedItems.clear();
+    }
+    renderMsgList();
+}
+
+function toggleMsgItemSelection(idx) {
+    if (!isMsgMultiSelectMode) return;
+    if (msgSelectedItems.has(idx)) {
+        msgSelectedItems.delete(idx);
+    } else {
+        msgSelectedItems.add(idx);
+    }
+    renderMsgList();
+}
+
+function msgSelectAllUndownloaded() {
+    msgSyncedItems.forEach((item, idx) => {
+        const dState = msgDownloadStates[item.awemeId];
+        const isDone = item.alreadyDownloaded || (dState && dState.status === 'done');
+        if (!isDone && !item.parseError) {
+            msgSelectedItems.add(idx);
+        }
+    });
+    renderMsgList();
+}
+
+async function downloadSelectedMsgItems() {
+    if (msgSelectedItems.size === 0) return;
+    const targets = Array.from(msgSelectedItems);
+    toggleMsgMultiSelectMode();
+
+    for (const idx of targets) {
+        const item = msgSyncedItems[idx];
+        if (!item || item.parseError) continue;
+        const ds = msgDownloadStates[item.awemeId];
+        if (ds && (ds.status === 'downloading' || ds.status === 'done')) continue;
+        await downloadMsgItem(idx);
     }
 }
 
