@@ -697,7 +697,7 @@ async function handleFavoritesSync() {
     try {
         syncBtn.classList.add('syncing');
         syncBtn.disabled = true;
-        syncBtn.querySelector('span').textContent = '同步中...';
+        syncBtn.querySelector('.btn-label').textContent = '同步中 . . .';
 
         const result = await api('POST', '/api/favorites/sync', { maxCount });
         if (result.taskId) {
@@ -715,7 +715,7 @@ async function handleFavoritesSync() {
         }
         syncBtn.classList.remove('syncing');
         syncBtn.disabled = false;
-        syncBtn.querySelector('span').textContent = '同步收藏';
+        syncBtn.querySelector('.btn-label').textContent = '同步收藏';
     }
 }
 
@@ -752,7 +752,7 @@ function pollFavSync(taskId) {
                 const syncBtn = document.getElementById('favSyncBtn');
                 syncBtn.classList.remove('syncing');
                 syncBtn.disabled = false;
-                syncBtn.querySelector('span').textContent = '同步收藏';
+                syncBtn.querySelector('.btn-label').textContent = '同步收藏';
                 loadFavStatus();
 
                 if (task.status === 'error') {
@@ -1171,7 +1171,7 @@ async function handleLikedSync() {
     try {
         syncBtn.classList.add('syncing');
         syncBtn.disabled = true;
-        syncBtn.querySelector('span').textContent = '同步中...';
+        syncBtn.querySelector('.btn-label').textContent = '同步中 . . .';
 
         const result = await api('POST', '/api/liked/sync', { maxCount });
         if (result.taskId) {
@@ -1187,7 +1187,7 @@ async function handleLikedSync() {
         }
         syncBtn.classList.remove('syncing');
         syncBtn.disabled = false;
-        syncBtn.querySelector('span').textContent = '同步喜欢';
+        syncBtn.querySelector('.btn-label').textContent = '同步喜欢';
     }
 }
 
@@ -1221,7 +1221,7 @@ function pollLikedSync(taskId) {
                 const syncBtn = document.getElementById('likedSyncBtn');
                 syncBtn.classList.remove('syncing');
                 syncBtn.disabled = false;
-                syncBtn.querySelector('span').textContent = '同步喜欢';
+                syncBtn.querySelector('.btn-label').textContent = '同步喜欢';
                 loadLikedStatus();
 
                 if (task.status === 'error') {
