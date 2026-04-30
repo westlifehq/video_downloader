@@ -69,7 +69,19 @@ body { font-family: var(--font-body); color: var(--on-surface); min-height: 100v
   box-shadow: 0 8px 32px rgba(37, 99, 235, 0.08);
   font-family: var(--font-heading);
 }
-.nav-brand { font-size: 1.5rem; font-weight: 800; color: var(--primary); letter-spacing: -0.03em; }
+.nav-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+}
+.brand-mark {
+  display: block;
+  width: 52px;
+  height: 52px;
+}
 .nav-links { display: flex; gap: 8px; }
 .nav-link {
   display: flex; align-items: center; gap: 6px;
@@ -422,4 +434,12 @@ body { font-family: var(--font-body); color: var(--on-surface); min-height: 100v
   .history-filters { padding: 0 16px 12px; }
   .history-list { padding: 0 16px 16px; }
   .nav-avatar { display: none; }
+  .nav-brand {
+    width: 48px;
+    height: 48px;
+  }
+  .brand-mark {
+    width: 44px;
+    height: 44px;
+  }
 }

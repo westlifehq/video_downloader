@@ -524,6 +524,21 @@ function toggleSettings() {
     }
 }
 
+function openSettingsSection() {
+    const panel = document.getElementById('settingsPanel');
+    const chevron = document.getElementById('settingsChevron');
+    const section = document.getElementById('settingsSection');
+
+    if (panel && (panel.style.display === 'none' || panel.style.display === '')) {
+        panel.style.display = 'block';
+        if (chevron) chevron.classList.add('open');
+    }
+
+    if (section) {
+        section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+}
+
 // ── Toast ──
 function showToast(msg, type = 'info') {
     const existing = document.querySelector('.toast');
