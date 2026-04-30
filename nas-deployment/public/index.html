@@ -1,290 +1,158 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Video Downloader</title>
-  <meta name="description" content="全平台视频无水印原画下载工具">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link
-    href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
-    rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=2">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=3">
 </head>
-
 <body>
-  <!-- 背景动效 -->
-  <div class="bg-grid"></div>
   <div class="bg-glow bg-glow--1"></div>
   <div class="bg-glow bg-glow--2"></div>
 
   <main class="container">
-    <!-- 头部 -->
     <header class="header">
-      <div class="logo">
-        <svg class="logo-icon" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path
-            d="M34 8H30C30 12.4183 26.4183 16 22 16V20C24.4 20 26.6 19.2 28.4 17.8V30C28.4 34.4183 24.8183 38 20.4 38C15.9817 38 12.4 34.4183 12.4 30C12.4 25.5817 15.9817 22 20.4 22V18C13.7726 18 8.4 23.3726 8.4 30C8.4 36.6274 13.7726 42 20.4 42C27.0274 42 32.4 36.6274 32.4 30V17.6C34.2 19.1 36.4 20 38.8 20V16C36.1 16 34 13.8 34 11V8Z"
-            fill="url(#paint0_linear)" />
-          <defs>
-            <linearGradient id="paint0_linear" x1="8.4" y1="8" x2="40" y2="42" gradientUnits="userSpaceOnUse">
-              <stop stop-color="#0ea5e9" />
-              <stop offset="0.5" stop-color="#06b6d4" />
-              <stop offset="1" stop-color="#0ea5e9" />
-            </linearGradient>
-          </defs>
-        </svg>
-        <h1 class="logo-text">Video Downloader</h1>
-      </div>
-      <p class="tagline">全平台自由下载 · 无水印 · 原画质</p>
+      <h1 class="logo-text">Video Downloader</h1>
+      <p class="tagline">无水印 · 原画质 · 全平台</p>
     </header>
 
-    <!-- 输入区域 -->
-    <section class="input-section">
+    <!-- 链接解析 -->
+    <section class="card">
       <div class="input-wrapper">
-        <textarea id="urlInput" class="url-input" placeholder="粘贴视频链接 (抖音/小红书等)..." autocomplete="off"
-          spellcheck="false" rows="1" oninput="handleInputResize(this)"></textarea>
+        <textarea id="urlInput" class="url-input" placeholder="粘贴视频链接（抖音 / 小红书）…" autocomplete="off" spellcheck="false" rows="1" oninput="handleInputResize(this)"></textarea>
         <button id="clearBtn" class="btn-clear" onclick="clearInput()" title="清空" style="display:none">
-          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
+          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
         <button id="parseBtn" class="btn btn--primary" onclick="handleParse()">
           <span class="btn-text">解析</span>
           <span class="btn-loader" style="display:none"></span>
         </button>
       </div>
-      <p class="input-hint">支持抖音、小红书平台的视频链接</p>
     </section>
 
-    <!-- 错误提示 -->
     <div id="errorMsg" class="error-msg" style="display:none"></div>
+    <div id="resultsContainer" class="results-container"></div>
 
-    <!-- 收藏同步 -->
-    <section class="favorites-section" id="favoritesSection">
-      <div class="favorites-header">
-        <div class="favorites-title">
-          <svg class="fav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
-          </svg>
-          <span>抖音收藏同步</span>
-          <span class="fav-account-badge" id="favAccountBadge" style="display:none">
-            <span class="badge-dot"></span>
-            <span id="favAccountText">已登录</span>
-          </span>
-        </div>
-        <div class="favorites-actions">
-          <button class="btn btn--account" id="favAccountBtn" onclick="handleFavAccount()" title="登录/切换账号">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-              <circle cx="12" cy="7" r="4"/>
-            </svg>
-            <span id="favAccountBtnText">登录</span>
-          </button>
-          <div style="display:flex;align-items:center;gap:6px;">
-            <input type="number" id="favMaxCount" value="50" min="1" max="500" title="同步最近N条" style="width:56px;padding:5px 6px;border-radius:6px;border:1px solid var(--c-border);background:var(--c-bg-sub);color:var(--c-text);font-size:12px;text-align:center;">
-            <button class="btn btn--sync" id="favSyncBtn" onclick="handleFavoritesSync()" disabled>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                <polyline points="23 4 23 10 17 10"/>
-                <polyline points="1 20 1 14 7 14"/>
-                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-              </svg>
-              <span>同步收藏</span>
-            </button>
-          </div>
+    <!-- 抖音同步 -->
+    <section class="card" id="syncSection">
+      <div class="card-header">
+        <span class="card-title">抖音同步</span>
+        <span class="badge" id="syncBadge" style="display:none"><span class="badge-dot"></span><span id="syncBadgeText">已登录</span></span>
+        <div class="card-actions">
+          <button class="btn btn--ghost-sm" id="syncAccountBtn" onclick="handleFavAccount()"><span id="favAccountBtnText">登录</span></button>
         </div>
       </div>
-      <!-- 同步进度面板 -->
-      <div id="favSyncPanel" class="fav-sync-panel" style="display:none"></div>
-      
-      <!-- 登录/输入 Cookie 面板 -->
-      <!-- Cookie 注入区域 (不再隐藏，永远提供重新注入的通道) -->
-        <div id="favLoginQrWrap" class="fav-login-qr-wrap" style="display:block; margin-top:20px;">
-            <div class="qr-hint" style="margin-bottom: 16px;">
-              <strong style="color: var(--text-primary); display: block; font-size: 1.1rem; margin-bottom: 8px;">无头扫码已关闭，请使用凭证验证</strong>
-              <p style="color: var(--text-tertiary); font-size: 0.85rem; line-height: 1.5;">由于抖音安全风控升级，NAS 自动登录引擎被阻断。<br>请从电脑浏览器中复制您的 <strong>sessionid</strong> Cookie进行身份绑定。</p>
-            </div>
-            <div style="font-size:14px; margin-bottom:12px; color:var(--c-text);">
-                <span style="font-weight:bold;">您目前未设置 Cookie 凭证</span> 或想要覆盖新凭证。
-            </div>
-            
-            <input type="text" id="cookieInput" class="fav-cookie-input" 
-                   placeholder="请填入您的 sessionid，例如：807c08..." 
-                   autocomplete="off" spellcheck="false" />
-            
-            <button id="cookieSubmitBtn" class="btn btn--primary" onclick="handleCookieSubmit()" style="margin-top:12px; width:100%; border-radius:8px;">
-                注入凭证并登录
-            </button>
-            
-            <div style="margin-top:16px; font-size:12px; color:var(--c-text-muted); line-height:1.6; text-align:left; background:var(--c-bg-sub); padding:10px; border-radius:6px;">
-                <b>如何获取 sessionid？</b><br>
-                1. 电脑浏览器无痕模式打开完整版 <a href="https://www.douyin.com" target="_blank" style="color:var(--c-primary)">抖音网页版</a> 并登录<br>
-                2. 按下 <b>F12</b> 打开开发者工具<br>
-                3. 打开 <b>Application (应用)</b> -> 左侧选择 <b>Cookies</b><br>
-                4. 找到名为 <code>sessionid</code> 的项，双击复制它的值（一串字母数字），贴在上方此框内。
-            </div>
-        </div>
-    </section>
 
-    <!-- 喜欢同步 -->
-    <section class="favorites-section" id="likedSection">
-      <div class="favorites-header">
-        <div class="favorites-title">
-          <svg class="fav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-          </svg>
-          <span>抖音喜欢同步</span>
-          <span class="fav-account-badge" id="likedAccountBadge" style="display:none">
-            <span class="badge-dot"></span>
-            <span id="likedAccountText">已登录</span>
-          </span>
-        </div>
-        <div class="favorites-actions">
-          <div style="display:flex;align-items:center;gap:6px;">
-            <input type="number" id="likedMaxCount" value="50" min="1" max="500" title="同步最近N条" style="width:56px;padding:5px 6px;border-radius:6px;border:1px solid var(--c-border);background:var(--c-bg-sub);color:var(--c-text);font-size:12px;text-align:center;">
-            <button class="btn btn--sync" id="likedSyncBtn" onclick="handleLikedSync()" disabled>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                <polyline points="23 4 23 10 17 10"/>
-                <polyline points="1 20 1 14 7 14"/>
-                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-              </svg>
-              <span>同步喜欢</span>
-            </button>
-          </div>
-        </div>
+      <div class="sync-tabs">
+        <button class="sync-tab active" data-tab="fav" onclick="switchSyncTab('fav')">收藏</button>
+        <button class="sync-tab" data-tab="liked" onclick="switchSyncTab('liked')">喜欢</button>
+        <button class="sync-tab" data-tab="schedule" onclick="switchSyncTab('schedule')">定时</button>
+        <button class="sync-tab" data-tab="auth" onclick="switchSyncTab('auth')">凭证</button>
       </div>
-      <!-- 同步进度面板 -->
-      <div id="likedSyncPanel" class="fav-sync-panel" style="display:none"></div>
-    </section>
 
-    <!-- 定时同步设置 -->
-    <section class="favorites-section" id="scheduleSection">
-      <div class="favorites-header">
-        <div class="favorites-title">
-          <svg class="fav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"/>
-            <polyline points="12 6 12 12 16 14"/>
-          </svg>
-          <span>定时同步</span>
-          <span class="fav-account-badge" id="scheduleBadge" style="display:none">
-            <span class="badge-dot"></span>
-            <span id="scheduleStatusText">已启用</span>
-          </span>
+      <!-- Tab: 收藏 -->
+      <div class="sync-tab-content active" id="tabFav">
+        <div class="sync-toolbar">
+          <label class="field-inline"><span>最近</span><input type="number" id="favMaxCount" value="50" min="1" max="500"><span>条</span></label>
+          <button class="btn btn--primary btn--sm" id="favSyncBtn" onclick="handleFavoritesSync()" disabled>同步收藏</button>
         </div>
-        <div class="favorites-actions">
-          <button class="btn btn--sync" id="scheduleToggleBtn" onclick="toggleSchedulePanel()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-              <circle cx="12" cy="12" r="3"/>
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06A1.65 1.65 0 0 0 15 19.4a1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-            </svg>
-            <span>设置</span>
-          </button>
-        </div>
+        <div id="favSyncPanel" class="sync-panel" style="display:none"></div>
       </div>
-      <div id="schedulePanel" class="fav-sync-panel" style="display:none">
-        <div style="padding:16px;display:flex;flex-direction:column;gap:14px;">
-          <!-- 启用开关 -->
-          <div style="display:flex;align-items:center;justify-content:space-between;">
-            <label style="font-size:14px;font-weight:500;color:var(--c-text)">启用定时同步</label>
-            <label class="switch">
-              <input type="checkbox" id="scheduleEnabled" onchange="saveScheduleConfig()">
-              <span class="slider"></span>
-            </label>
+
+      <!-- Tab: 喜欢 -->
+      <div class="sync-tab-content" id="tabLiked">
+        <div class="sync-toolbar">
+          <label class="field-inline"><span>最近</span><input type="number" id="likedMaxCount" value="50" min="1" max="500"><span>条</span></label>
+          <button class="btn btn--primary btn--sm" id="likedSyncBtn" onclick="handleLikedSync()" disabled>同步喜欢</button>
+        </div>
+        <div id="likedSyncPanel" class="sync-panel" style="display:none"></div>
+      </div>
+
+      <!-- Tab: 定时 -->
+      <div class="sync-tab-content" id="tabSchedule">
+        <div class="schedule-form">
+          <div class="form-row"><label>启用</label><label class="switch"><input type="checkbox" id="scheduleEnabled" onchange="saveScheduleConfig()"><span class="slider"></span></label></div>
+          <div class="form-row"><label>触发模式</label>
+            <select id="scheduleTriggerMode" onchange="onTriggerModeChange()" class="form-select">
+              <option value="fixed">固定时间</option>
+              <option value="random">随机时段（防风控）</option>
+            </select>
           </div>
-          <!-- 执行时间 -->
-          <div style="display:flex;flex-direction:column;gap:6px;">
-            <label style="font-size:13px;color:var(--c-text-muted)">执行时间（每天）</label>
-            <div style="display:flex;gap:8px;align-items:center;">
-              <input type="time" id="scheduleTime" value="00:00" onchange="saveScheduleConfig()" style="padding:6px 10px;border-radius:6px;border:1px solid var(--c-border);background:var(--c-bg-sub);color:var(--c-text);font-size:14px;">
-              <span style="font-size:12px;color:var(--c-text-muted)">每天自动运行</span>
-            </div>
+          <div class="form-row" id="scheduleFixedRow"><label>执行时间</label><input type="time" id="scheduleTime" value="00:00" onchange="saveScheduleConfig()" class="form-input form-input--time"></div>
+          <div class="form-row" id="scheduleRandomRow" style="display:none;"><label>随机区间</label>
+            <div class="time-range"><input type="time" id="scheduleRangeStart" value="00:00" onchange="saveScheduleConfig()" class="form-input form-input--time"><span>—</span><input type="time" id="scheduleRangeEnd" value="06:00" onchange="saveScheduleConfig()" class="form-input form-input--time"></div>
           </div>
-          <!-- 同步模式 -->
-          <div style="display:flex;flex-direction:column;gap:6px;">
-            <label style="font-size:13px;color:var(--c-text-muted)">同步内容</label>
-            <select id="scheduleSyncMode" onchange="saveScheduleConfig()" style="padding:6px 10px;border-radius:6px;border:1px solid var(--c-border);background:var(--c-bg-sub);color:var(--c-text);font-size:14px;">
-              <option value="both">收藏 + 喜欢 (自动去重)</option>
+          <div class="form-row"><label>同步内容</label>
+            <select id="scheduleSyncMode" onchange="saveScheduleConfig()" class="form-select">
+              <option value="both">收藏 + 喜欢（去重）</option>
               <option value="favorites">仅收藏</option>
               <option value="liked">仅喜欢</option>
             </select>
           </div>
-          <!-- 最大条数 -->
-          <div style="display:flex;flex-direction:column;gap:6px;">
-            <label style="font-size:13px;color:var(--c-text-muted)">每次同步最近多少条</label>
-            <input type="number" id="scheduleMaxCount" value="50" min="1" max="500" onchange="saveScheduleConfig()" style="padding:6px 10px;border-radius:6px;border:1px solid var(--c-border);background:var(--c-bg-sub);color:var(--c-text);font-size:14px;width:100px;">
+          <div class="form-row"><label>最大条数</label><input type="number" id="scheduleMaxCount" value="50" min="1" max="500" onchange="saveScheduleConfig()" class="form-input" style="width:72px;"></div>
+          <div class="form-actions">
+            <button class="btn btn--primary btn--sm" onclick="triggerScheduleNow()">立即执行</button>
+            <button class="btn btn--ghost-sm" onclick="loadScheduleLogs()">日志</button>
           </div>
-          <!-- 手动触发 -->
-          <div style="display:flex;gap:8px;margin-top:4px;">
-            <button class="btn btn--primary" onclick="triggerScheduleNow()" style="padding:6px 14px;font-size:13px;border-radius:8px;">立即执行一次</button>
-            <button class="btn btn--secondary" onclick="loadScheduleLogs()" style="padding:6px 14px;font-size:13px;border-radius:8px;">查看日志</button>
-          </div>
-          <!-- 日志面板 -->
-          <div id="scheduleLogPanel" style="display:none;margin-top:8px;max-height:200px;overflow-y:auto;background:var(--c-bg-sub);border-radius:8px;padding:10px;font-size:12px;color:var(--c-text-muted);"></div>
+          <div id="scheduleLogPanel" class="schedule-log" style="display:none;"></div>
+        </div>
+      </div>
+
+      <!-- Tab: 凭证 -->
+      <div class="sync-tab-content" id="tabAuth">
+        <div class="auth-form">
+          <p class="auth-hint">粘贴抖音 <code>sessionid</code> Cookie 完成登录绑定</p>
+          <input type="text" id="cookieInput" class="form-input" placeholder="sessionid 值…" autocomplete="off" spellcheck="false">
+          <button id="cookieSubmitBtn" class="btn btn--primary btn--sm" onclick="handleCookieSubmit()" style="width:100%;margin-top:10px;">绑定凭证</button>
+          <details class="auth-help">
+            <summary>如何获取？</summary>
+            <ol>
+              <li>浏览器打开 <a href="https://www.douyin.com" target="_blank">douyin.com</a> 并登录</li>
+              <li>F12 → Application → Cookies</li>
+              <li>复制 <code>sessionid</code> 值粘贴到上方</li>
+            </ol>
+          </details>
         </div>
       </div>
     </section>
 
-    <!-- 解析结果列表容器 -->
-    <div id="resultsContainer" class="results-container"></div>
-
-    <!-- 历史记录 -->
-    <section id="historySection" class="history-section" style="display:none">
-      <div class="section-header">
-        <h3>下载历史</h3>
-        <button class="btn btn--ghost" onclick="clearHistory()">清空</button>
+    <!-- 下载历史 -->
+    <section class="card" id="historySection" style="display:none">
+      <div class="card-header">
+        <span class="card-title">下载历史</span>
+        <button class="btn btn--ghost-sm" onclick="clearHistory()">清空</button>
       </div>
-      <!-- 筛选工具栏 -->
-      <div class="history-filters" id="historyFilters" style="display:none;padding:10px 0;gap:8px;flex-wrap:wrap;align-items:center;">
-        <input type="text" id="historyFilterKeyword" placeholder="搜索标题/作者..." oninput="applyHistoryFilter()" style="padding:5px 10px;border-radius:6px;border:1px solid var(--c-border);background:var(--c-bg-sub);color:var(--c-text);font-size:13px;flex:1;min-width:120px;">
-        <select id="historyFilterAuthor" onchange="applyHistoryFilter()" style="padding:5px 8px;border-radius:6px;border:1px solid var(--c-border);background:var(--c-bg-sub);color:var(--c-text);font-size:13px;">
-          <option value="">全部作者</option>
-        </select>
-        <select id="historyFilterDate" onchange="applyHistoryFilter()" style="padding:5px 8px;border-radius:6px;border:1px solid var(--c-border);background:var(--c-bg-sub);color:var(--c-text);font-size:13px;">
-          <option value="">全部时间</option>
-          <option value="today">今天</option>
-          <option value="week">最近7天</option>
-          <option value="month">最近30天</option>
+      <div class="history-filters" id="historyFilters" style="display:none;">
+        <input type="text" id="historyFilterKeyword" placeholder="搜索…" oninput="applyHistoryFilter()" class="form-input form-input--sm">
+        <select id="historyFilterAuthor" onchange="applyHistoryFilter()" class="form-select form-select--sm"><option value="">全部作者</option></select>
+        <select id="historyFilterDate" onchange="applyHistoryFilter()" class="form-select form-select--sm">
+          <option value="">全部时间</option><option value="today">今天</option><option value="week">7天</option><option value="month">30天</option>
         </select>
       </div>
       <div id="historyList" class="history-list"></div>
     </section>
 
-    <!-- 设置面板 -->
-    <section class="settings-section">
-      <div class="section-header" onclick="toggleSettings()">
-        <h3>
-          <svg class="settings-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="3" />
-            <path
-              d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-          </svg>
-          设置
-        </h3>
-        <svg class="chevron" id="settingsChevron" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-          stroke-width="2">
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
+    <!-- 设置 -->
+    <section class="card">
+      <div class="card-header" onclick="toggleSettings()" style="cursor:pointer;">
+        <span class="card-title">设置</span>
+        <svg class="chevron" id="settingsChevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><polyline points="6 9 12 15 18 9"/></svg>
       </div>
-      <div id="settingsPanel" class="settings-panel" style="display:none">
-        <div class="setting-item">
-          <label class="setting-label">下载目录</label>
-          <div class="setting-input-row">
-            <input type="text" id="downloadDir" class="setting-input" placeholder="输入下载目录路径…">
-            <button class="btn btn--secondary" onclick="saveConfig()">保存</button>
+      <div id="settingsPanel" style="display:none;padding:0 20px 20px;">
+        <div class="form-row">
+          <label>下载目录</label>
+          <div style="display:flex;gap:8px;flex:1;">
+            <input type="text" id="downloadDir" class="form-input" placeholder="默认 ~/Downloads/douyin" style="flex:1;">
+            <button class="btn btn--primary btn--sm" onclick="saveConfig()">保存</button>
           </div>
-          <p class="setting-hint">视频将保存到此目录，留空则使用默认路径 ~/Downloads/douyin</p>
         </div>
       </div>
     </section>
   </main>
 
-  <footer class="footer">
-    <p>仅供个人学习研究使用</p>
-  </footer>
-
-  <script src="app.js?v=20240404"></script>
+  <footer class="footer"><p>仅供个人学习研究使用</p></footer>
+  <script src="app.js?v=20260430"></script>
 </body>
-
 </html>

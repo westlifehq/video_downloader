@@ -784,23 +784,50 @@ async function runScheduledSync() {
     return logEntry;
 }
 
+let randomTimer = null;
 function startScheduledTask() {
     if (scheduledTask) { scheduledTask.stop(); scheduledTask = null; }
+    if (randomTimer) { clearTimeout(randomTimer); randomTimer = null; }
     const config = readScheduleConfig();
     if (!config.enabled) { console.log('[定时同步] 已禁用'); return; }
-    if (!cron.validate(config.cronTime)) { console.error(`[定时同步] cron 表达式无效: ${config.cronTime}`); return; }
-    scheduledTask = cron.schedule(config.cronTime, () => { runScheduledSync().catch(err => console.error('[定时同步] 执行出错:', err.message)); });
-    console.log(`[定时同步] 已启动，cron="${config.cronTime}", 模式="${config.syncMode}", 最多=${config.maxCount}条`);
+    if (config.triggerMode === 'random') {
+        scheduledTask = cron.schedule('0 0 * * *', () => { scheduleRandomExecution(config); });
+        scheduleRandomExecution(config);
+        console.log(`[定时同步] 随机模式启动，范围 ${config.rangeStart || '00:00'}-${config.rangeEnd || '06:00'}`);
+    } else {
+        if (!cron.validate(config.cronTime)) { console.error(`[定时同步] cron 表达式无效: ${config.cronTime}`); return; }
+        scheduledTask = cron.schedule(config.cronTime, () => { runScheduledSync().catch(err => console.error('[定时同步] 执行出错:', err.message)); });
+        console.log(`[定时同步] 固定模式启动，cron="${config.cronTime}", 模式="${config.syncMode}", 最多=${config.maxCount}条`);
+    }
+}
+
+function scheduleRandomExecution(config) {
+    const now = new Date();
+    const [startH, startM] = (config.rangeStart || '00:00').split(':').map(Number);
+    const [endH, endM] = (config.rangeEnd || '06:00').split(':').map(Number);
+    const startMinutes = startH * 60 + startM;
+    const endMinutes = endH * 60 + endM;
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    if (nowMinutes >= endMinutes) return;
+    const rangeFrom = Math.max(startMinutes, nowMinutes + 1);
+    if (rangeFrom >= endMinutes) return;
+    const randomMinute = rangeFrom + Math.floor(Math.random() * (endMinutes - rangeFrom));
+    const delayMs = (randomMinute - nowMinutes) * 60 * 1000;
+    console.log(`[定时同步] 随机触发安排在 ${String(Math.floor(randomMinute/60)).padStart(2,'0')}:${String(randomMinute%60).padStart(2,'0')}`);
+    randomTimer = setTimeout(() => { runScheduledSync().catch(err => console.error('[定时同步] 随机执行出错:', err.message)); }, delayMs);
 }
 
 app.get('/api/schedule/config', (req, res) => { res.json(readScheduleConfig()); });
 app.post('/api/schedule/config', (req, res) => {
-    const { enabled, cronTime, syncMode, maxCount } = req.body;
+    const { enabled, cronTime, syncMode, maxCount, triggerMode, rangeStart, rangeEnd } = req.body;
     const cfg = readScheduleConfig();
     if (typeof enabled === 'boolean') cfg.enabled = enabled;
     if (cronTime !== undefined) { if (!cron.validate(cronTime)) return res.status(400).json({ error: `无效的 cron 表达式: ${cronTime}` }); cfg.cronTime = cronTime; }
     if (syncMode && ['favorites', 'liked', 'both'].includes(syncMode)) cfg.syncMode = syncMode;
     if (maxCount && Number.isInteger(maxCount) && maxCount > 0 && maxCount <= 500) cfg.maxCount = maxCount;
+    if (triggerMode && ['fixed', 'random'].includes(triggerMode)) cfg.triggerMode = triggerMode;
+    if (rangeStart) cfg.rangeStart = rangeStart;
+    if (rangeEnd) cfg.rangeEnd = rangeEnd;
     writeScheduleConfig(cfg);
     startScheduledTask();
     res.json({ success: true, config: cfg });

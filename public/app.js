@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadHistory();
     loadFavStatus();
     loadLikedStatus();
+    loadScheduleConfig();
 
     document.getElementById('urlInput').addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -26,6 +27,15 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => handleParse(), 100);
     });
 });
+
+// ── Tab 切换 ──
+function switchSyncTab(tab) {
+    document.querySelectorAll('.sync-tab').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.sync-tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelector(`.sync-tab[data-tab="${tab}"]`).classList.add('active');
+    const tabMap = { fav: 'tabFav', liked: 'tabLiked', schedule: 'tabSchedule', auth: 'tabAuth' };
+    document.getElementById(tabMap[tab]).classList.add('active');
+}
 
 // ── UI 交互逻辑 ──
 function handleInputResize(el) {
@@ -571,21 +581,19 @@ async function loadFavStatus() {
 }
 
 function updateFavUI(status) {
-    const badge = document.getElementById('favAccountBadge');
-    const accountBtn = document.getElementById('favAccountBtn');
+    const badge = document.getElementById('syncBadge');
+    const accountBtn = document.getElementById('syncAccountBtn');
     const accountBtnText = document.getElementById('favAccountBtnText');
     const syncBtn = document.getElementById('favSyncBtn');
 
     if (status.loggedIn) {
         badge.style.display = 'inline-flex';
-        document.getElementById('favAccountText').textContent =
-            status.lastSyncTime ? `上次同步 ${formatSyncTime(status.lastSyncTime)}` : '已登录';
-        accountBtn.className = 'btn btn--account logged-in';
+        document.getElementById('syncBadgeText').textContent =
+            status.lastSyncTime ? `同步 ${formatSyncTime(status.lastSyncTime)}` : '已登录';
         accountBtnText.textContent = '切换账号';
         syncBtn.disabled = false;
     } else {
         badge.style.display = 'none';
-        accountBtn.className = 'btn btn--account';
         accountBtnText.textContent = '登录';
         syncBtn.disabled = true;
     }
@@ -616,42 +624,21 @@ async function handleFavAccount() {
             showToast('已退出当前账号', 'success');
             favIsLoggedIn = false;
             updateFavUI({ loggedIn: false });
-            
-            // 退出后自动打开注入面板
-            setTimeout(() => {
-                const panel = document.getElementById('favSyncPanel');
-                const qrWrap = document.getElementById('favLoginQrWrap');
-                if (panel) panel.style.display = 'none';
-                if (qrWrap) qrWrap.style.display = 'block';
-                const inputBtn = document.getElementById('cookieInput');
-                if (inputBtn) inputBtn.focus();
-            }, 300);
+            updateLikedUI({ loggedIn: false });
+            switchSyncTab('auth');
             favSyncedItems = [];
         } catch (err) {
             showToast('退出失败: ' + err.message, 'error');
         }
     } else {
-        try {
-            // 直接展现凭证注入区域
-            const panel = document.getElementById('favSyncPanel');
-            const qrWrap = document.getElementById('favLoginQrWrap');
-            
-            panel.style.display = 'none'; // 隐藏同步面板
-            qrWrap.style.display = 'block'; // 显示手动注入面板
-            
-            setTimeout(() => {
-                const inputBtn = document.getElementById('cookieInput');
-                if (inputBtn) inputBtn.focus();
-            }, 100);
-        } catch (err) {
-            showToast('操作失败: ' + err.message, 'error');
-        }
+        switchSyncTab('auth');
+        setTimeout(() => {
+            const input = document.getElementById('cookieInput');
+            if (input) input.focus();
+        }, 100);
     }
 }
 
-/**
- * 展开/收起 手动 Cookie 注入输入框
- */
 function toggleCookieLogin(e) {
     if (e) e.preventDefault();
 }
@@ -670,25 +657,19 @@ async function handleCookieSubmit() {
     }
 
     btn.disabled = true;
-    btn.textContent = '正在注入...';
+    btn.textContent = '绑定中...';
 
     try {
         await api('POST', '/api/favorites/cookie-login', { cookie: cookieVal });
-        
-        // 清理界面
-        document.getElementById('favLoginQrWrap').style.display = 'none';
         input.value = '';
-        
-        showToast('账号绑定成功！正在拉取内容...', 'success');
-        
-        // 同步拉取并更新界面状态
+        showToast('绑定成功！', 'success');
         await loadFavStatus();
-        
+        switchSyncTab('fav');
     } catch (err) {
-        showToast('Cookie 验证失败: ' + err.message, 'error');
+        showToast('绑定失败: ' + err.message, 'error');
     } finally {
         btn.disabled = false;
-        btn.textContent = '验证 Cookie';
+        btn.textContent = '绑定凭证';
     }
 }
 
@@ -1161,15 +1142,10 @@ async function loadLikedStatus() {
 }
 
 function updateLikedUI(status) {
-    const badge = document.getElementById('likedAccountBadge');
     const syncBtn = document.getElementById('likedSyncBtn');
-
     if (status.loggedIn) {
-        badge.style.display = 'inline-flex';
-        document.getElementById('likedAccountText').textContent = '已登录';
         syncBtn.disabled = false;
     } else {
-        badge.style.display = 'none';
         syncBtn.disabled = true;
     }
 }
@@ -1610,11 +1586,17 @@ async function loadScheduleConfig() {
         document.getElementById('scheduleMaxCount').value = cfg.maxCount || 50;
 
         // 将 cron 表达式转为 HH:MM 时间展示
-        // 默认 cron: "0 0 * * *" => 00:00
         const cronParts = (cfg.cronTime || '0 0 * * *').split(' ');
         const hour = (cronParts[1] || '0').padStart(2, '0');
         const minute = (cronParts[0] || '0').padStart(2, '0');
         document.getElementById('scheduleTime').value = `${hour}:${minute}`;
+
+        // 随机触发模式
+        const triggerMode = cfg.triggerMode || 'fixed';
+        document.getElementById('scheduleTriggerMode').value = triggerMode;
+        document.getElementById('scheduleRangeStart').value = cfg.rangeStart || '00:00';
+        document.getElementById('scheduleRangeEnd').value = cfg.rangeEnd || '06:00';
+        onTriggerModeChange();
 
         updateScheduleBadge(cfg.enabled);
     } catch (err) {
@@ -1625,26 +1607,38 @@ async function loadScheduleConfig() {
 function updateScheduleBadge(enabled) {
     const badge = document.getElementById('scheduleBadge');
     const text = document.getElementById('scheduleStatusText');
-    if (enabled) {
-        badge.style.display = 'inline-flex';
-        text.textContent = '已启用';
-    } else {
-        badge.style.display = 'none';
+    if (badge) {
+        if (enabled) {
+            badge.style.display = 'inline-flex';
+            if (text) text.textContent = '运行中';
+        } else {
+            badge.style.display = 'none';
+        }
     }
+}
+
+// ── 定时触发模式切换 ──
+function onTriggerModeChange() {
+    const mode = document.getElementById('scheduleTriggerMode').value;
+    document.getElementById('scheduleFixedRow').style.display = mode === 'fixed' ? 'flex' : 'none';
+    document.getElementById('scheduleRandomRow').style.display = mode === 'random' ? 'flex' : 'none';
 }
 
 async function saveScheduleConfig() {
     const enabled = document.getElementById('scheduleEnabled').checked;
+    const triggerMode = document.getElementById('scheduleTriggerMode').value;
     const timeVal = document.getElementById('scheduleTime').value || '00:00';
     const syncMode = document.getElementById('scheduleSyncMode').value;
     const maxCount = parseInt(document.getElementById('scheduleMaxCount').value) || 50;
+    const rangeStart = document.getElementById('scheduleRangeStart').value || '00:00';
+    const rangeEnd = document.getElementById('scheduleRangeEnd').value || '06:00';
 
-    // 将 HH:MM 转为 cron 表达式
+    // 固定模式使用 cron，随机模式使用 range
     const [hour, minute] = timeVal.split(':');
     const cronTime = `${parseInt(minute)} ${parseInt(hour)} * * *`;
 
     try {
-        const result = await api('POST', '/api/schedule/config', { enabled, cronTime, syncMode, maxCount });
+        await api('POST', '/api/schedule/config', { enabled, cronTime, syncMode, maxCount, triggerMode, rangeStart, rangeEnd });
         updateScheduleBadge(enabled);
         showToast('定时同步配置已保存', 'success');
     } catch (err) {
