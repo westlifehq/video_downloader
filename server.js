@@ -673,6 +673,139 @@ app.get('/api/liked/sync/:taskId', (req, res) => {
     res.json(task);
 });
 
+
+// ═══════════════════════════════════════════
+// 私信同步 API
+// ═══════════════════════════════════════════
+
+const msgSyncTasks = new Map();
+
+/**
+ * POST /api/messages/sync — 开始私信视频同步
+ */
+app.post('/api/messages/sync', async (req, res) => {
+    const maxCount = req.body.maxCount || 50;
+
+    // 检查是否已有同步任务在进行
+    for (const task of msgSyncTasks.values()) {
+        if (task.status === 'fetching') {
+            return res.status(409).json({ error: '已有同步任务进行中', taskId: task.id });
+        }
+    }
+
+    const taskId = uuidv4();
+    const task = {
+        id: taskId,
+        status: 'fetching',
+        phase: '正在初始化...',
+        collected: 0,
+        maxCount,
+        items: [],
+        error: null,
+        startTime: Date.now(),
+        interrupted: false,
+    };
+    msgSyncTasks.set(taskId, task);
+
+    res.json({ success: true, taskId });
+
+    try {
+        const rawItems = await favorites.fetchMessageVideos(maxCount, (progress) => {
+            task.phase = progress.phase;
+            task.collected = progress.collected;
+        }, () => task.interrupted);
+
+        if (rawItems.length === 0) {
+            task.status = 'done';
+            task.phase = '未在私信中发现视频';
+            return;
+        }
+
+        const downloadDir = getEffectiveDownloadDir();
+
+        for (const rawItem of rawItems) {
+            try {
+                // fetchMessageVideos 返回的已经是 normalizeVideoData 处理后的数据
+                const info = rawItem;
+                const awemeId = info.awemeId || '';
+                const isImage = info.type === 'image';
+                const safeName = douyin.sanitizeFilename(info.title || awemeId || 'douyin');
+                const fileName = isImage
+                    ? `[图集]_${safeName}`
+                    : `${safeName}_${awemeId || Date.now()}.mp4`;
+                const savePath = path.join(downloadDir, fileName);
+                const alreadyDownloaded = fs.existsSync(savePath);
+
+                task.items.push({
+                    type: info.type,
+                    videoUrl: info.videoUrl,
+                    images: info.images,
+                    title: info.title,
+                    author: info.author,
+                    cover: info.cover,
+                    awemeId,
+                    duration: info.duration,
+                    width: info.width,
+                    height: info.height,
+                    platform: 'douyin',
+                    alreadyDownloaded,
+                    fileName,
+                    filePath: savePath,
+                });
+            } catch (err) {
+                task.items.push({
+                    title: rawItem.title || '未知',
+                    awemeId: rawItem.awemeId || '',
+                    cover: '',
+                    parseError: err.message,
+                    alreadyDownloaded: false,
+                });
+            }
+        }
+
+        task.status = 'done';
+        task.phase = task.interrupted ? `已打断，获取到 ${task.items.length} 条私信视频` : `已获取 ${task.items.length} 条私信视频`;
+        console.log(`[私信同步] ${task.phase}`);
+    } catch (err) {
+        task.status = 'error';
+        task.error = err.message;
+        task.phase = '获取私信视频列表失败';
+        console.error(`[私信同步] 错误: ${err.message}`);
+    }
+});
+
+/**
+ * POST /api/messages/sync/stop — 打断私信同步任务
+ */
+app.post('/api/messages/sync/stop', (req, res) => {
+    const { taskId } = req.body;
+    if (!taskId) return res.status(400).json({ error: '未提供 taskId' });
+    
+    const task = msgSyncTasks.get(taskId);
+    if (!task) {
+        return res.status(404).json({ error: '任务不存在' });
+    }
+    
+    if (task.status === 'fetching') {
+        task.interrupted = true;
+        console.log(`[私信同步] 接收到打断信号 taskId=${taskId}`);
+        return res.json({ success: true, message: '打断信号已发送' });
+    }
+    
+    res.json({ success: false, message: '任务不在获取阶段，无法打断' });
+});
+
+/**
+ * GET /api/messages/sync/:taskId — 查询私信同步任务进度
+ */
+app.get('/api/messages/sync/:taskId', (req, res) => {
+    const task = msgSyncTasks.get(req.params.taskId);
+    if (!task) {
+        return res.status(404).json({ error: '任务不存在' });
+    }
+    res.json(task);
+});
+
 // ═══════════════════════════════════════════
 // 定时同步 & 下载
 // ═══════════════════════════════════════════
@@ -697,15 +830,11 @@ function readScheduleLog() {
 function appendScheduleLog(entry) {
     const logs = readScheduleLog();
     logs.unshift(entry);
-    // 只保留最近 50 条
     fs.writeFileSync(SCHEDULE_LOG_PATH, JSON.stringify(logs.slice(0, 50), null, 2));
 }
 
 let scheduledTask = null;
 
-/**
- * 执行定时同步 + 下载
- */
 async function runScheduledSync() {
     const config = readScheduleConfig();
     const logEntry = { time: new Date().toISOString(), syncMode: config.syncMode, maxCount: config.maxCount, results: [], error: null };
@@ -722,54 +851,37 @@ async function runScheduledSync() {
     const downloadDir = getEffectiveDownloadDir();
     if (!fs.existsSync(downloadDir)) fs.mkdirSync(downloadDir, { recursive: true });
 
-    // 收集所有已下载 ID（用于跨收藏/喜欢去重）
     const syncedData = favorites.getSyncedData();
     const likedData = favorites.getLikedData();
     const allDownloadedIds = new Set([...(syncedData.ids || []), ...(likedData.ids || [])]);
 
-    const allItems = []; // { info, source }
+    const allItems = [];
 
     try {
-        // 收藏同步
         if (config.syncMode === 'favorites' || config.syncMode === 'both') {
-            console.log('[定时同步] 正在获取收藏列表...');
             const favRaw = await favorites.fetchFavorites(config.maxCount, null, null, 'favorite');
             for (const raw of favRaw) {
-                try {
-                    const info = douyin.normalizeVideoData(raw);
-                    allItems.push({ info, source: 'favorite' });
-                } catch (e) { /* skip */ }
+                try { allItems.push({ info: douyin.normalizeVideoData(raw), source: 'favorite' }); } catch (e) { }
             }
-            console.log(`[定时同步] 收藏获取 ${favRaw.length} 条`);
         }
-
-        // 喜欢同步
         if (config.syncMode === 'liked' || config.syncMode === 'both') {
-            console.log('[定时同步] 正在获取喜欢列表...');
             const likedRaw = await favorites.fetchLikedVideos(config.maxCount, null, null);
             for (const raw of likedRaw) {
-                try {
-                    const info = douyin.normalizeVideoData(raw);
-                    allItems.push({ info, source: 'liked' });
-                } catch (e) { /* skip */ }
+                try { allItems.push({ info: douyin.normalizeVideoData(raw), source: 'liked' }); } catch (e) { }
             }
-            console.log(`[定时同步] 喜欢获取 ${likedRaw.length} 条`);
         }
     } catch (err) {
         logEntry.error = `同步阶段出错: ${err.message}`;
         appendScheduleLog(logEntry);
-        console.error('[定时同步] 同步阶段出错:', err.message);
         return logEntry;
     }
 
-    // 去重：按 awemeId 去重，跳过已下载
     const seenIds = new Set();
     const toDownload = [];
     for (const { info } of allItems) {
         const awemeId = info.awemeId || '';
         if (!awemeId || seenIds.has(awemeId) || allDownloadedIds.has(awemeId)) continue;
         seenIds.add(awemeId);
-        // 检查文件是否已存在
         const isImage = info.type === 'image';
         const safeName = douyin.sanitizeFilename(info.title || awemeId || 'douyin');
         const fileName = isImage ? `[图集]_${safeName}` : `${safeName}_${awemeId || Date.now()}.mp4`;
@@ -778,80 +890,46 @@ async function runScheduledSync() {
         toDownload.push({ info, fileName, savePath });
     }
 
-    console.log(`[定时同步] 去重后需下载 ${toDownload.length} 条`);
     logEntry.totalFound = allItems.length;
     logEntry.toDownload = toDownload.length;
 
-    // 逐条下载
     let successCount = 0, failCount = 0;
     for (const { info, fileName, savePath } of toDownload) {
         try {
             const referer = 'https://www.douyin.com/';
-            const isImage = info.type === 'image';
-            if (isImage) {
+            if (info.type === 'image') {
                 await douyin.downloadImages(info.images, savePath, null, referer);
             } else {
                 await douyin.downloadVideo(info.videoUrl, savePath, null, referer);
             }
-            // 标记已下载
-            const awemeId = info.awemeId;
-            if (awemeId) {
-                try { favorites.saveSyncedIds([awemeId]); } catch (e) { }
-                try { favorites.saveLikedIds([awemeId]); } catch (e) { }
+            if (info.awemeId) {
+                try { favorites.saveSyncedIds([info.awemeId]); } catch (e) { }
+                try { favorites.saveLikedIds([info.awemeId]); } catch (e) { }
             }
             successCount++;
-            console.log(`[定时同步] ✓ 下载完成: ${fileName}`);
         } catch (err) {
             failCount++;
-            console.error(`[定时同步] ✕ 下载失败: ${info.title} - ${err.message}`);
         }
     }
 
     logEntry.results = { success: successCount, fail: failCount };
     appendScheduleLog(logEntry);
-    console.log(`[定时同步] 完成: 成功=${successCount}, 失败=${failCount}`);
     return logEntry;
 }
 
-/**
- * 启动/重启定时任务（支持固定模式和随机时段模式）
- */
 let randomTimer = null;
 function startScheduledTask() {
-    if (scheduledTask) {
-        scheduledTask.stop();
-        scheduledTask = null;
-    }
-    if (randomTimer) {
-        clearTimeout(randomTimer);
-        randomTimer = null;
-    }
-
+    if (scheduledTask) { scheduledTask.stop(); scheduledTask = null; }
+    if (randomTimer) { clearTimeout(randomTimer); randomTimer = null; }
     const config = readScheduleConfig();
-    if (!config.enabled) {
-        console.log('[定时同步] 已禁用');
-        return;
-    }
-
+    if (!config.enabled) { console.log('[定时同步] 已禁用'); return; }
     if (config.triggerMode === 'random') {
-        // 随机时段模式：每天0点调度一次，随机选取 rangeStart ~ rangeEnd 之间的时间执行
-        scheduledTask = cron.schedule('0 0 * * *', () => {
-            scheduleRandomExecution(config);
-        });
-        // 如果今天还在范围内，也立即安排
+        scheduledTask = cron.schedule('0 0 * * *', () => { scheduleRandomExecution(config); });
         scheduleRandomExecution(config);
         console.log(`[定时同步] 随机模式启动，范围 ${config.rangeStart || '00:00'}-${config.rangeEnd || '06:00'}`);
     } else {
-        // 固定时间模式
-        if (!cron.validate(config.cronTime)) {
-            console.error(`[定时同步] cron 表达式无效: ${config.cronTime}`);
-            return;
-        }
-        scheduledTask = cron.schedule(config.cronTime, () => {
-            runScheduledSync().catch(err => {
-                console.error('[定时同步] 执行出错:', err.message);
-            });
-        });
+        if (!cron.validate(config.cronTime)) { console.error(`[定时同步] cron 表达式无效: ${config.cronTime}`); return; }
+        scheduledTask = cron.schedule(config.cronTime, () => { runScheduledSync().catch(err => console.error('[定时同步] 执行出错:', err.message)); });
         console.log(`[定时同步] 固定模式启动，cron="${config.cronTime}", 模式="${config.syncMode}", 最多=${config.maxCount}条`);
     }
 }
@@ -860,85 +938,42 @@ function scheduleRandomExecution(config) {
     const now = new Date();
     const [startH, startM] = (config.rangeStart || '00:00').split(':').map(Number);
     const [endH, endM] = (config.rangeEnd || '06:00').split(':').map(Number);
-
     const startMinutes = startH * 60 + startM;
     const endMinutes = endH * 60 + endM;
     const nowMinutes = now.getHours() * 60 + now.getMinutes();
-
-    // 如果已经超过结束时间，今天不再执行
     if (nowMinutes >= endMinutes) return;
-
-    // 从 max(startMinutes, nowMinutes) 到 endMinutes 之间随机选取
     const rangeFrom = Math.max(startMinutes, nowMinutes + 1);
     if (rangeFrom >= endMinutes) return;
-
     const randomMinute = rangeFrom + Math.floor(Math.random() * (endMinutes - rangeFrom));
     const delayMs = (randomMinute - nowMinutes) * 60 * 1000;
-
-    const execHour = String(Math.floor(randomMinute / 60)).padStart(2, '0');
-    const execMin = String(randomMinute % 60).padStart(2, '0');
-    console.log(`[定时同步] 随机触发安排在今天 ${execHour}:${execMin}（约${Math.round(delayMs / 60000)}分钟后）`);
-
-    randomTimer = setTimeout(() => {
-        runScheduledSync().catch(err => {
-            console.error('[定时同步] 随机执行出错:', err.message);
-        });
-    }, delayMs);
+    console.log(`[定时同步] 随机触发安排在 ${String(Math.floor(randomMinute/60)).padStart(2,'0')}:${String(randomMinute%60).padStart(2,'0')}`);
+    randomTimer = setTimeout(() => { runScheduledSync().catch(err => console.error('[定时同步] 随机执行出错:', err.message)); }, delayMs);
 }
 
-/**
- * GET /api/schedule/config — 获取定时同步配置
- */
-app.get('/api/schedule/config', (req, res) => {
-    res.json(readScheduleConfig());
-});
-
-/**
- * POST /api/schedule/config — 保存定时同步配置并重启任务
- */
+app.get('/api/schedule/config', (req, res) => { res.json(readScheduleConfig()); });
 app.post('/api/schedule/config', (req, res) => {
     const { enabled, cronTime, syncMode, maxCount, triggerMode, rangeStart, rangeEnd } = req.body;
     const cfg = readScheduleConfig();
-
     if (typeof enabled === 'boolean') cfg.enabled = enabled;
-    if (cronTime !== undefined) {
-        if (!cron.validate(cronTime)) {
-            return res.status(400).json({ error: `无效的 cron 表达式: ${cronTime}` });
-        }
-        cfg.cronTime = cronTime;
-    }
+    if (cronTime !== undefined) { if (!cron.validate(cronTime)) return res.status(400).json({ error: `无效的 cron 表达式: ${cronTime}` }); cfg.cronTime = cronTime; }
     if (syncMode && ['favorites', 'liked', 'both'].includes(syncMode)) cfg.syncMode = syncMode;
     if (maxCount && Number.isInteger(maxCount) && maxCount > 0 && maxCount <= 500) cfg.maxCount = maxCount;
     if (triggerMode && ['fixed', 'random'].includes(triggerMode)) cfg.triggerMode = triggerMode;
     if (rangeStart) cfg.rangeStart = rangeStart;
     if (rangeEnd) cfg.rangeEnd = rangeEnd;
-
     writeScheduleConfig(cfg);
     startScheduledTask();
     res.json({ success: true, config: cfg });
 });
-
-/**
- * GET /api/schedule/logs — 获取定时同步执行日志
- */
-app.get('/api/schedule/logs', (req, res) => {
-    res.json(readScheduleLog());
-});
-
-/**
- * POST /api/schedule/run — 手动触发一次定时同步
- */
+app.get('/api/schedule/logs', (req, res) => { res.json(readScheduleLog()); });
 app.post('/api/schedule/run', async (req, res) => {
     res.json({ success: true, message: '已触发定时同步' });
-    runScheduledSync().catch(err => {
-        console.error('[定时同步] 手动触发执行出错:', err.message);
-    });
+    runScheduledSync().catch(err => console.error('[定时同步] 手动触发执行出错:', err.message));
 });
 
 // 启动服务器
 app.listen(PORT, () => {
     console.log(`\n🎬 抖音视频下载器已启动`);
     console.log(`📍 http://localhost:${PORT}\n`);
-    // 启动定时任务
     startScheduledTask();
 });

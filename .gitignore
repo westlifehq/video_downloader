@@ -23,6 +23,7 @@ douyin-downloader-mac
 
 # 排除实验性杂碎文件
 test_*.js
+test-*.js
 current_doc_state.json
 fetched_doc.json
 fetched_doc.md
