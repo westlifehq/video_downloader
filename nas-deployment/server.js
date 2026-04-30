@@ -724,17 +724,30 @@ async function runScheduledSync() {
 
     const allItems = [];
 
+    const shouldSyncFav = ['favorites', 'both', 'all'].includes(config.syncMode);
+    const shouldSyncLiked = ['liked', 'both', 'all'].includes(config.syncMode);
+    const shouldSyncMessages = ['messages', 'all'].includes(config.syncMode);
+
     try {
-        if (config.syncMode === 'favorites' || config.syncMode === 'both') {
+        if (shouldSyncFav) {
             const favRaw = await favorites.fetchFavorites(config.maxCount, null, null, 'favorite');
             for (const raw of favRaw) {
                 try { allItems.push({ info: douyin.normalizeVideoData(raw), source: 'favorite' }); } catch (e) { }
             }
         }
-        if (config.syncMode === 'liked' || config.syncMode === 'both') {
+        if (shouldSyncLiked) {
             const likedRaw = await favorites.fetchLikedVideos(config.maxCount, null, null);
             for (const raw of likedRaw) {
                 try { allItems.push({ info: douyin.normalizeVideoData(raw), source: 'liked' }); } catch (e) { }
+            }
+        }
+        if (shouldSyncMessages) {
+            console.log('[定时同步] 开始私信同步...');
+            const msgItems = await favorites.fetchMessageVideos(config.maxCount, (progress) => {
+                console.log(`[定时同步] 私信: ${progress.phase}`);
+            }, () => false);
+            for (const item of msgItems) {
+                try { allItems.push({ info: item, source: 'messages' }); } catch (e) { }
             }
         }
     } catch (err) {
@@ -791,29 +804,37 @@ function startScheduledTask() {
     const config = readScheduleConfig();
     if (!config.enabled) { console.log('[定时同步] 已禁用'); return; }
     if (config.triggerMode === 'random') {
-        scheduledTask = cron.schedule('0 0 * * *', () => { scheduleRandomExecution(config); });
+        // 每天北京时间 0 点触发随机安排（使用 Asia/Shanghai 时区）
+        scheduledTask = cron.schedule('0 0 * * *', () => { scheduleRandomExecution(config); }, { timezone: 'Asia/Shanghai' });
         scheduleRandomExecution(config);
         console.log(`[定时同步] 随机模式启动，范围 ${config.rangeStart || '00:00'}-${config.rangeEnd || '06:00'}`);
     } else {
         if (!cron.validate(config.cronTime)) { console.error(`[定时同步] cron 表达式无效: ${config.cronTime}`); return; }
-        scheduledTask = cron.schedule(config.cronTime, () => { runScheduledSync().catch(err => console.error('[定时同步] 执行出错:', err.message)); });
+        scheduledTask = cron.schedule(config.cronTime, () => { runScheduledSync().catch(err => console.error('[定时同步] 执行出错:', err.message)); }, { timezone: 'Asia/Shanghai' });
         console.log(`[定时同步] 固定模式启动，cron="${config.cronTime}", 模式="${config.syncMode}", 最多=${config.maxCount}条`);
     }
 }
 
 function scheduleRandomExecution(config) {
-    const now = new Date();
+    if (randomTimer) { clearTimeout(randomTimer); randomTimer = null; }
+    // 使用北京时间计算
+    const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Shanghai' }));
     const [startH, startM] = (config.rangeStart || '00:00').split(':').map(Number);
     const [endH, endM] = (config.rangeEnd || '06:00').split(':').map(Number);
     const startMinutes = startH * 60 + startM;
     const endMinutes = endH * 60 + endM;
     const nowMinutes = now.getHours() * 60 + now.getMinutes();
-    if (nowMinutes >= endMinutes) return;
+
+    // 如果当前时间已经超过结束时间，等明天再执行
+    if (nowMinutes >= endMinutes) {
+        console.log(`[定时同步] 当前北京时间 ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')} 已过执行窗口，等待明日触发`);
+        return;
+    }
     const rangeFrom = Math.max(startMinutes, nowMinutes + 1);
     if (rangeFrom >= endMinutes) return;
     const randomMinute = rangeFrom + Math.floor(Math.random() * (endMinutes - rangeFrom));
     const delayMs = (randomMinute - nowMinutes) * 60 * 1000;
-    console.log(`[定时同步] 随机触发安排在 ${String(Math.floor(randomMinute/60)).padStart(2,'0')}:${String(randomMinute%60).padStart(2,'0')}`);
+    console.log(`[定时同步] 随机触发安排在北京时间 ${String(Math.floor(randomMinute/60)).padStart(2,'0')}:${String(randomMinute%60).padStart(2,'0')}（${Math.round(delayMs/60000)}分钟后）`);
     randomTimer = setTimeout(() => { runScheduledSync().catch(err => console.error('[定时同步] 随机执行出错:', err.message)); }, delayMs);
 }
 
@@ -823,7 +844,7 @@ app.post('/api/schedule/config', (req, res) => {
     const cfg = readScheduleConfig();
     if (typeof enabled === 'boolean') cfg.enabled = enabled;
     if (cronTime !== undefined) { if (!cron.validate(cronTime)) return res.status(400).json({ error: `无效的 cron 表达式: ${cronTime}` }); cfg.cronTime = cronTime; }
-    if (syncMode && ['favorites', 'liked', 'both'].includes(syncMode)) cfg.syncMode = syncMode;
+    if (syncMode && ['favorites', 'liked', 'both', 'messages', 'all'].includes(syncMode)) cfg.syncMode = syncMode;
     if (maxCount && Number.isInteger(maxCount) && maxCount > 0 && maxCount <= 500) cfg.maxCount = maxCount;
     if (triggerMode && ['fixed', 'random'].includes(triggerMode)) cfg.triggerMode = triggerMode;
     if (rangeStart) cfg.rangeStart = rangeStart;
