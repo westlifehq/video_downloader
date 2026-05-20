@@ -132,7 +132,13 @@ async function handleParse() {
         const id = 'task_' + Date.now() + '_' + i;
         appState.items[id] = { id, url, loading: true };
         appendCardPlaceHolder(id);
+    }
 
+    // 平滑滚动到解析区域，展示“解析中...”动画
+    container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    urls.forEach((url, i) => {
+        const id = Object.keys(appState.items)[i];
         api('POST', '/api/parse', { url })
             .then(res => {
                 appState.items[id] = { ...appState.items[id], loading: false, info: res.data };
@@ -142,7 +148,7 @@ async function handleParse() {
                 appState.items[id] = { ...appState.items[id], loading: false, error: err.message };
                 updateCard(id);
             });
-    }
+    });
 
     setLoading(btn, false);
 }
@@ -183,6 +189,201 @@ function updateCard(id) {
     }
 
     const info = item.info;
+
+    // 如果是用户主页类型，使用专用用户卡片渲染
+    if (info.type === 'user') {
+        if (item.syncStatus === undefined) {
+            item.syncStatus = 'idle'; // idle, fetching, done, error
+            item.syncPhase = '';
+            item.syncCollected = 0;
+            item.syncMaxCount = 50;
+            item.syncTaskId = '';
+            item.userItems = [];
+            item.userDownloadStates = {};
+            item.isMultiSelectMode = false;
+            item.selectedItems = new Set();
+            item.downloadedExpanded = false;
+        }
+
+        if (item.syncStatus === 'idle') {
+            el.innerHTML = `
+              <div class="video-card user-sync-card" style="flex-direction:column; align-items:stretch;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <div class="author-avatar" style="width:36px; height:36px; border-radius:50%; background:var(--c-primary); display:flex; align-items:center; justify-content:center; font-weight:bold; color:white; font-size:18px;">👤</div>
+                    <div>
+                      <h3 style="font-size:15px; font-weight:600; color:white; margin:0;">${item.nickname || info.author?.nickname || '抖音用户'}</h3>
+                      <p style="font-size:12px; color:var(--c-text-muted); margin:0;">检测到这是一个抖音用户主页，可以同步并批量下载作品。</p>
+                    </div>
+                  </div>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <select id="user-sync-count-${id}" class="select-field" style="width:120px; display:inline-block; height:36px; padding:0 8px; border-radius:6px; background:rgba(255,255,255,0.05); color:white; border:1px solid rgba(255,255,255,0.1);" onchange="appState.items['${id}'].syncMaxCount = parseInt(this.value)">
+                    <option value="50" ${item.syncMaxCount === 50 ? 'selected' : ''}>最新 50 条</option>
+                    <option value="100" ${item.syncMaxCount === 100 ? 'selected' : ''}>最新 100 条</option>
+                    <option value="200" ${item.syncMaxCount === 200 ? 'selected' : ''}>最新 200 条</option>
+                    <option value="500" ${item.syncMaxCount === 500 ? 'selected' : ''}>最新 500 条</option>
+                  </select>
+                  <button class="btn btn--sync" style="flex:1; height:36px; border-radius:6px;" onclick="handleUserSync('${id}', '${info.secUid}')">提取作品列表</button>
+                </div>
+              </div>
+            `;
+            return;
+        }
+
+        if (item.syncStatus === 'fetching') {
+            el.innerHTML = `
+              <div class="video-card user-sync-card" style="flex-direction:column; align-items:stretch;">
+                <div class="fav-sync-header" style="margin-bottom:8px">
+                  <span class="fav-sync-phase" style="font-size:13px; font-weight:600;">${item.syncPhase || '正在同步作品列表...'}</span>
+                  <span class="fav-sync-counter" style="margin-left:8px; font-size:12px; color:var(--c-text-muted);">已发现 ${item.syncCollected || 0} 条</span>
+                  <button class="btn btn--stop" style="padding:4px 10px; font-size:11px; border-radius:6px; color:white; border:none; cursor:pointer;" onclick="stopUserSync('${id}')">停止打断</button>
+                </div>
+                <div class="fav-sync-progress" style="height:4px; background:var(--c-border); border-radius:2px; overflow:hidden; margin-top:8px;">
+                  <div class="fav-sync-progress-fill indeterminate" style="width:30%"></div>
+                </div>
+              </div>
+            `;
+            return;
+        }
+
+        if (item.syncStatus === 'error') {
+            el.innerHTML = `
+              <div class="video-card user-sync-card" style="flex-direction:column; align-items:stretch; border-color: rgba(248, 113, 113, 0.4);">
+                <h3 style="font-size:14px; font-weight:600; color:var(--c-error); margin:0 0 8px 0;">获取作品失败</h3>
+                <p style="font-size:12px; color:var(--c-text-muted); margin:0 0 12px 0;">${item.error || '出错了，请检查本地网络或登录状态'}</p>
+                <div style="display:flex; gap:8px;">
+                  <button class="btn btn--secondary" style="flex:1; height:32px; border-radius:6px; font-size:12px;" onclick="resetUserSync('${id}')">返回重新设置</button>
+                  <button class="btn btn--sync" style="flex:1; height:32px; border-radius:6px; font-size:12px;" onclick="handleUserSync('${id}', '${info.secUid}')">重试同步</button>
+                </div>
+              </div>
+            `;
+            return;
+        }
+
+        if (item.syncStatus === 'done') {
+            const undownloaded = [];
+            const downloaded = [];
+            const errored = [];
+
+            item.userItems.forEach((uItem, idx) => {
+                uItem._idx = idx;
+                if (uItem.parseError) {
+                    errored.push(uItem);
+                } else {
+                    const ds = item.userDownloadStates[uItem.awemeId];
+                    const isDone = uItem.alreadyDownloaded || (ds && ds.status === 'done');
+                    if (isDone) {
+                        downloaded.push(uItem);
+                    } else {
+                        undownloaded.push(uItem);
+                    }
+                }
+            });
+
+            let headerHtml = `
+              <div class="video-card user-sync-card" style="flex-direction:column; align-items:stretch; padding:12px 16px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:8px;">
+                  <div style="display:flex; align-items:center; gap:8px; min-width:0;">
+                    <div class="author-avatar" style="width:32px; height:32px; border-radius:50%; background:var(--c-primary); display:flex; align-items:center; justify-content:center; font-weight:bold; color:white; font-size:16px; flex-shrink:0;">👤</div>
+                    <div style="min-width:0;">
+                      <h3 style="font-size:14px; font-weight:600; color:white; margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${item.nickname || info.author?.nickname}">${item.nickname || info.author?.nickname || '抖音用户'}</h3>
+                      <p style="font-size:11px; color:var(--c-text-muted); margin:0;">主页作品同步 (发现 ${item.userItems.length} 条)</p>
+                    </div>
+                  </div>
+                  <button class="btn btn--secondary" style="padding:4px 8px; font-size:11px; border-radius:6px; height:24px; flex-shrink:0;" onclick="resetUserSync('${id}')">重设</button>
+                </div>
+            `;
+
+            let bodyHtml = '';
+
+            // 多选模式头部
+            if (item.isMultiSelectMode) {
+                bodyHtml += `
+                  <div class="multi-select-bar" style="margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; background:rgba(124, 58, 237, 0.15); padding:6px 10px; border-radius:6px;">
+                    <span style="font-size:12px; font-weight:600; color:var(--c-primary)">已选 ${item.selectedItems.size} 项</span>
+                    <div class="multi-select-actions" style="display:flex; gap:6px; align-items:center;">
+                      <select class="select-field" style="width:90px; height:22px; padding:0 4px; font-size:11px; border-radius:6px; background:rgba(255,255,255,0.08); color:white; border:1px solid rgba(255,255,255,0.15); cursor:pointer;" onchange="if(this.value) { userSelectRecent('${id}', parseInt(this.value)); this.value=''; }">
+                        <option value="" style="background:#1e293b; color:white;">快速勾选...</option>
+                        <option value="10" style="background:#1e293b; color:white;">最近 10 条</option>
+                        <option value="20" style="background:#1e293b; color:white;">最近 20 条</option>
+                        <option value="50" style="background:#1e293b; color:white;">最近 50 条</option>
+                        <option value="100" style="background:#1e293b; color:white;">最近 100 条</option>
+                      </select>
+                      <button class="btn btn--secondary" style="padding:3px 8px; font-size:11px; border-radius:6px; height:22px;" onclick="userSelectAllUndownloaded('${id}')">全选未下载</button>
+                      <button class="btn btn--secondary" style="padding:3px 8px; font-size:11px; border-radius:6px; height:22px;" onclick="toggleUserMultiSelectMode('${id}')">取消</button>
+                      <button class="btn btn--sync" style="padding:3px 10px; font-size:11px; border-radius:6px; height:22px;" onclick="downloadSelectedUserItems('${id}')" ${item.selectedItems.size === 0 ? 'disabled' : ''}>下载所选</button>
+                    </div>
+                  </div>
+                `;
+            }
+
+            // 未下载区域
+            bodyHtml += `
+              <div class="fav-group" style="${item.isMultiSelectMode ? 'opacity:0.9' : ''}">
+                <div class="fav-sync-header" style="margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+                  <span class="fav-sync-phase" style="font-size:12px; font-weight:600; color:var(--c-text)">📥 未下载 (${undownloaded.length})</span>
+                  ${(!item.isMultiSelectMode && item.userItems.length > 0) ? `
+                  <div style="display:flex; gap:6px; align-items:center;">
+                    <select class="select-field" style="width:90px; height:22px; padding:0 4px; font-size:11px; border-radius:6px; background:rgba(255,255,255,0.08); color:white; border:1px solid rgba(255,255,255,0.15); cursor:pointer;" onchange="if(this.value) { userSelectRecent('${id}', parseInt(this.value)); this.value=''; }">
+                      <option value="" style="background:#1e293b; color:white;">快速勾选...</option>
+                      <option value="10" style="background:#1e293b; color:white;">最近 10 条</option>
+                      <option value="20" style="background:#1e293b; color:white;">最近 20 条</option>
+                      <option value="50" style="background:#1e293b; color:white;">最近 50 条</option>
+                      <option value="100" style="background:#1e293b; color:white;">最近 100 条</option>
+                    </select>
+                    <button class="btn btn--secondary" onclick="toggleUserMultiSelectMode('${id}')" style="padding:3px 8px; font-size:11px; border-radius:6px; height:22px;">多选</button>
+                    ${undownloaded.length > 0 ? `<button class="btn btn--sync" onclick="downloadAllUserItems('${id}')" style="padding:3px 8px; font-size:11px; border-radius:6px; height:22px; display:inline-flex; align-items:center; gap:3px;">
+                      <span>全部下载</span>
+                    </button>` : ''}
+                  </div>` : ''}
+                </div>`;
+
+            if (undownloaded.length === 0) {
+                bodyHtml += '<div style="padding:10px 0; text-align:center; color:var(--c-text-muted); font-size:11px">🎉 全部已下载</div>';
+            } else {
+                bodyHtml += '<div class="fav-sync-items" style="max-height:220px; overflow-y:auto; display:flex; flex-direction:column; gap:4px; border:1px solid rgba(255,255,255,0.05); padding:4px; border-radius:6px; background:rgba(0,0,0,0.1);">';
+                bodyHtml += undownloaded.map(uItem => renderUserItemCardHTML(id, uItem, false)).join('');
+                bodyHtml += '</div>';
+            }
+            bodyHtml += '</div>';
+
+            // 已下载区域（可折叠）
+            if (downloaded.length > 0) {
+                bodyHtml += `
+                  <div class="fav-group" style="margin-top:10px">
+                    <div class="fav-sync-header fav-downloaded-toggle" onclick="toggleUserDownloadedList('${id}')" style="cursor:pointer; margin-bottom:${item.downloadedExpanded ? '8' : '0'}px; display:flex; justify-content:space-between; align-items:center; padding:4px 0;">
+                      <span class="fav-sync-phase" style="display:flex; align-items:center; gap:4px; font-size:12px; font-weight:600; color:var(--c-text);">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="10" height="10"
+                             style="transition:transform 0.2s; transform:rotate(${item.downloadedExpanded ? '90' : '0'}deg)">
+                          <polyline points="9 18 15 12 9 6"/>
+                        </svg>
+                        ✅ 已下载 (${downloaded.length})
+                      </span>
+                      <span class="fav-sync-counter" style="font-size:10px; color:var(--c-text-muted)">点击${item.downloadedExpanded ? '收起' : '展开'}</span>
+                    </div>`;
+
+                if (item.downloadedExpanded) {
+                    bodyHtml += '<div class="fav-sync-items" style="max-height:160px; overflow-y:auto; display:flex; flex-direction:column; gap:4px; border:1px solid rgba(255,255,255,0.05); padding:4px; border-radius:6px; background:rgba(0,0,0,0.1);">';
+                    bodyHtml += downloaded.map(uItem => renderUserItemCardHTML(id, uItem, true)).join('');
+                    bodyHtml += '</div>';
+                }
+                bodyHtml += '</div>';
+            }
+
+            if (errored.length > 0) {
+                bodyHtml += '<div style="margin-top:8px; display:flex; flex-direction:column; gap:4px;">';
+                bodyHtml += errored.map(uItem => `<div class="fav-sync-item" style="opacity:0.5; padding:4px 8px; font-size:11px; color:var(--c-error)">
+                    <span class="fav-sync-item-title">${uItem.title} (解析失败: ${uItem.parseError})</span>
+                </div>`).join('');
+                bodyHtml += '</div>';
+            }
+
+            el.innerHTML = headerHtml + bodyHtml + '</div>';
+            return;
+        }
+    }
+
     const isImage = info.type === 'image';
 
     let durationHtml = '';
@@ -2156,3 +2357,418 @@ async function loadScheduleLogs() {
 document.addEventListener('DOMContentLoaded', () => {
     loadScheduleConfig();
 });
+
+// ── 用户主页同步前端逻辑 ──
+
+function renderUserItemCardHTML(cardId, uItem, isDownloadedSection) {
+    const item = appState.items[cardId];
+    const idx = uItem._idx;
+    const coverHtml = uItem.cover
+        ? `<img src="${uItem.cover}" style="width:36px;height:36px;border-radius:6px;object-fit:cover;flex-shrink:0" onerror="this.style.display='none'">`
+        : '';
+
+    const dState = item.userDownloadStates[uItem.awemeId];
+    const isDownloading = dState && dState.status === 'downloading';
+    const isDownloaded = uItem.alreadyDownloaded || (dState && dState.status === 'done');
+    const isError = dState && dState.status === 'error';
+
+    let actionHtml = '';
+
+    if (isDownloading) {
+        const progress = dState.progress || 0;
+        actionHtml = `<div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+            <div style="width:50px;height:4px;background:var(--c-border);border-radius:2px;overflow:hidden">
+                <div style="width:${progress}%;height:100%;background:linear-gradient(90deg,var(--c-primary),var(--c-accent));border-radius:2px;transition:width 0.3s"></div>
+            </div>
+            <span style="font-size:10px;color:var(--c-primary);font-family:var(--font-mono);white-space:nowrap">${progress}%</span>
+        </div>`;
+    } else if (isDownloadedSection && isDownloaded) {
+        actionHtml = `<div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+            <button class="btn btn--primary" style="padding:4px 8px;font-size:10px;border-radius:6px;opacity:0.7;height:24px;" onclick="redownloadUserItem('${cardId}', ${idx})" title="重新下载">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="10" height="10">
+                    <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                </svg>
+            </button>
+            <button class="action-btn action-btn--open" style="opacity:1;width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;" onclick="openUserFile('${cardId}', ${idx})" title="打开文件夹">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                </svg>
+            </button>
+            <button class="action-btn action-btn--delete" style="opacity:1;width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;" onclick="deleteUserFile('${cardId}', ${idx})" title="删除文件">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+                    <polyline points="3 6 5 6 21 6"/>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                </svg>
+            </button>
+        </div>`;
+    } else if (!isDownloaded) {
+        actionHtml = `<button class="btn btn--primary" style="padding:4px 10px;font-size:11px;border-radius:6px;white-space:nowrap;flex-shrink:0;height:24px;" onclick="downloadUserItem('${cardId}', ${idx})">
+            <span>下载</span>
+        </button>`;
+    }
+
+    if (isError && !isDownloaded) {
+        actionHtml = `<div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+            <span style="font-size:10px;color:var(--c-error)">失败</span>
+            <button class="btn btn--primary" style="padding:3px 8px;font-size:10px;border-radius:6px;height:22px;" onclick="downloadUserItem('${cardId}', ${idx})">重试</button>
+        </div>`;
+    }
+
+    const isSelected = item.selectedItems.has(idx);
+    const checkboxHtml = item.isMultiSelectMode ? `
+        <div class="fav-checkbox-wrap" style="margin-right:6px;">
+            <input type="checkbox" class="fav-checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); toggleUserItemSelection('${cardId}', ${idx})" />
+        </div>
+    ` : '';
+
+    if (item.isMultiSelectMode) {
+        actionHtml = '';
+    }
+
+    return `<div class="fav-sync-item ${isSelected ? 'selected' : ''}" style="padding:6px 8px;gap:8px;align-items:center;${item.isMultiSelectMode ? 'cursor:pointer;' : ''}" ${item.isMultiSelectMode ? `onclick="toggleUserItemSelection('${cardId}', ${idx})"` : ''}>
+        ${checkboxHtml}
+        ${coverHtml}
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px">
+            <span class="fav-sync-item-title" style="font-size:12px;line-height:1.3;" title="${uItem.title}">${uItem.title}</span>
+            <span style="font-size:10px;color:var(--c-text-muted)">@${uItem.author || item.nickname || '作者'}</span>
+        </div>
+        ${actionHtml}
+    </div>`;
+}
+
+async function handleUserSync(cardId, secUid) {
+    const item = appState.items[cardId];
+    if (!item) return;
+
+    item.syncStatus = 'fetching';
+    item.syncPhase = '正在发起同步请求...';
+    item.syncCollected = 0;
+    updateCard(cardId);
+
+    try {
+        const result = await api('POST', '/api/user/sync', { secUid, maxCount: item.syncMaxCount });
+        if (!result.taskId) throw new Error('同步请求失败，未返回任务 ID');
+        item.syncTaskId = result.taskId;
+        pollUserSync(cardId, result.taskId);
+    } catch (err) {
+        item.syncStatus = 'error';
+        item.error = err.message;
+        updateCard(cardId);
+        showToast('提取作品失败: ' + err.message, 'error');
+    }
+}
+
+function pollUserSync(cardId, taskId) {
+    const item = appState.items[cardId];
+    if (!item) return;
+
+    if (appState.pollTimers[cardId]) clearInterval(appState.pollTimers[cardId]);
+
+    appState.pollTimers[cardId] = setInterval(async () => {
+        try {
+            const task = await api('GET', `/api/user/sync/${taskId}`);
+            item.syncPhase = task.phase || '正在同步作品列表...';
+            item.syncCollected = task.collected || 0;
+            if (task.nickname) item.nickname = task.nickname;
+
+            if (task.status === 'done' || task.status === 'error') {
+                clearInterval(appState.pollTimers[cardId]);
+                delete appState.pollTimers[cardId];
+
+                if (task.status === 'error') {
+                    item.syncStatus = 'error';
+                    item.error = task.error || '获取作品列表失败';
+                    updateCard(cardId);
+                    showToast('获取作品列表失败', 'error');
+                } else {
+                    item.syncStatus = 'done';
+                    item.userItems = task.items || [];
+                    item.userDownloadStates = {};
+                    item.selectedItems.clear();
+                    updateCard(cardId);
+                    const newCount = item.userItems.filter(i => !i.alreadyDownloaded && !i.parseError).length;
+                    showToast(`已获取 ${task.items.length} 条作品，${newCount} 条未下载`, 'success');
+                }
+            } else {
+                updateCard(cardId);
+            }
+        } catch (err) {
+            console.error('轮询用户同步进度失败:', err);
+        }
+    }, 1000);
+}
+
+async function stopUserSync(cardId) {
+    const item = appState.items[cardId];
+    if (!item || !item.syncTaskId) return;
+    try {
+        await api('POST', '/api/user/sync/stop', { taskId: item.syncTaskId });
+        showToast('已发送停止指令', 'info');
+    } catch (e) {
+        showToast('停止同步失败: ' + e.message, 'error');
+    }
+}
+
+function resetUserSync(cardId) {
+    const item = appState.items[cardId];
+    if (!item) return;
+    item.syncStatus = 'idle';
+    item.userItems = [];
+    item.userDownloadStates = {};
+    item.selectedItems.clear();
+    updateCard(cardId);
+}
+
+function toggleUserDownloadedList(cardId) {
+    const item = appState.items[cardId];
+    if (!item) return;
+    item.downloadedExpanded = !item.downloadedExpanded;
+    updateCard(cardId);
+}
+
+function toggleUserMultiSelectMode(cardId) {
+    const item = appState.items[cardId];
+    if (!item) return;
+    item.isMultiSelectMode = !item.isMultiSelectMode;
+    if (!item.isMultiSelectMode) {
+        item.selectedItems.clear();
+    }
+    updateCard(cardId);
+}
+
+function toggleUserItemSelection(cardId, idx) {
+    const item = appState.items[cardId];
+    if (!item) return;
+    if (item.selectedItems.has(idx)) {
+        item.selectedItems.delete(idx);
+    } else {
+        item.selectedItems.add(idx);
+    }
+    updateCard(cardId);
+}
+
+function userSelectRecent(cardId, count) {
+    const item = appState.items[cardId];
+    if (!item) return;
+    item.isMultiSelectMode = true;
+    item.selectedItems.clear();
+    let selectedCount = 0;
+    for (let idx = 0; idx < item.userItems.length; idx++) {
+        const uItem = item.userItems[idx];
+        if (!uItem.alreadyDownloaded && !uItem.parseError) {
+            const ds = item.userDownloadStates[uItem.awemeId];
+            const isDone = ds && ds.status === 'done';
+            if (!isDone) {
+                item.selectedItems.add(idx);
+                selectedCount++;
+                if (selectedCount >= count) {
+                    break;
+                }
+            }
+        }
+    }
+    updateCard(cardId);
+}
+
+function userSelectAllUndownloaded(cardId) {
+    const item = appState.items[cardId];
+    if (!item) return;
+    item.selectedItems.clear();
+    item.userItems.forEach((uItem, idx) => {
+        if (!uItem.alreadyDownloaded && !uItem.parseError) {
+            const ds = item.userDownloadStates[uItem.awemeId];
+            const isDone = ds && ds.status === 'done';
+            if (!isDone) {
+                item.selectedItems.add(idx);
+            }
+        }
+    });
+    updateCard(cardId);
+}
+
+async function downloadUserItem(cardId, idx, subDir = '') {
+    const item = appState.items[cardId];
+    if (!item) return;
+    const uItem = item.userItems[idx];
+    if (!uItem) return;
+
+    const awemeId = uItem.awemeId;
+    if (item.userDownloadStates[awemeId] && item.userDownloadStates[awemeId].status === 'downloading') return;
+
+    uItem.alreadyDownloaded = false;
+    item.userDownloadStates[awemeId] = { status: 'downloading', progress: 0 };
+    updateCard(cardId);
+
+    try {
+        const result = await api('POST', '/api/download', {
+            type: uItem.type,
+            videoUrl: uItem.videoUrl,
+            images: uItem.images,
+            title: uItem.title,
+            awemeId: uItem.awemeId,
+            platform: uItem.platform || 'douyin',
+            subDir: subDir || '',
+        });
+        if (!result.taskId) throw new Error('No taskId');
+
+        const pollId = setInterval(async () => {
+            try {
+                const task = await api('GET', `/api/download/${result.taskId}`);
+                if (!item.userDownloadStates[awemeId]) {
+                    clearInterval(pollId);
+                    return;
+                }
+                item.userDownloadStates[awemeId].progress = task.progress || 0;
+
+                if (task.status === 'done') {
+                    clearInterval(pollId);
+                    item.userDownloadStates[awemeId] = { status: 'done', filePath: task.filePath, fileName: task.fileName, fileSize: task.fileSize };
+                    uItem.alreadyDownloaded = true;
+                    updateCard(cardId);
+                    addToHistory({
+                        fileName: task.fileName,
+                        filePath: task.filePath,
+                        fileSize: task.fileSize,
+                        info: { title: uItem.title, cover: uItem.cover, type: uItem.type },
+                    });
+                    loadHistory();
+                } else if (task.status === 'error') {
+                    clearInterval(pollId);
+                    item.userDownloadStates[awemeId].status = 'error';
+                    updateCard(cardId);
+                    showToast(`下载失败: ${task.error || '未知错误'}`, 'error');
+                } else {
+                    updateCard(cardId);
+                }
+            } catch (e) { }
+        }, 500);
+    } catch (err) {
+        item.userDownloadStates[awemeId].status = 'error';
+        updateCard(cardId);
+        showToast('下载请求失败: ' + err.message, 'error');
+    }
+}
+
+async function redownloadUserItem(cardId, idx) {
+    const item = appState.items[cardId];
+    if (!item) return;
+    const uItem = item.userItems[idx];
+    if (!uItem) return;
+    uItem.alreadyDownloaded = false;
+    delete item.userDownloadStates[uItem.awemeId];
+    await downloadUserItem(cardId, idx);
+}
+
+async function openUserFile(cardId, idx) {
+    const item = appState.items[cardId];
+    if (!item) return;
+    const uItem = item.userItems[idx];
+    if (!uItem) return;
+    const ds = item.userDownloadStates[uItem.awemeId];
+    const fp = (ds && ds.filePath) || uItem.filePath;
+    if (fp) {
+        await openHistoryFile(fp);
+    } else {
+        showToast('未找到本地文件路径', 'info');
+    }
+}
+
+async function deleteUserFile(cardId, idx) {
+    const item = appState.items[cardId];
+    if (!item) return;
+    const uItem = item.userItems[idx];
+    if (!uItem) return;
+    const ds = item.userDownloadStates[uItem.awemeId];
+    const fp = (ds && ds.filePath) || uItem.filePath;
+    if (!fp) {
+        showToast('未找到本地文件路径', 'info');
+        return;
+    }
+    if (!confirm(`确定删除文件？\n${fp}`)) return;
+    try {
+        await api('POST', '/api/history/delete', { filePath: fp });
+        showToast('文件已删除', 'success');
+        let history = JSON.parse(localStorage.getItem('dy_history') || '[]');
+        history = history.filter(h => h.filePath !== fp);
+        localStorage.setItem('dy_history', JSON.stringify(history));
+        loadHistory();
+    } catch (err) {
+        if (err.message.includes('不存在')) {
+            showToast('文件已经不存在了', 'info');
+        } else {
+            showToast('删除失败: ' + err.message, 'error');
+            return;
+        }
+    }
+    uItem.alreadyDownloaded = false;
+    delete item.userDownloadStates[uItem.awemeId];
+    updateCard(cardId);
+}
+
+async function downloadSelectedUserItems(cardId) {
+    const item = appState.items[cardId];
+    if (!item) return;
+    const indices = Array.from(item.selectedItems);
+    
+    // 过滤出真正需要下载的条数
+    const toDownload = indices.filter(idx => {
+        const uItem = item.userItems[idx];
+        if (!uItem || uItem.alreadyDownloaded || uItem.parseError) return false;
+        const ds = item.userDownloadStates[uItem.awemeId];
+        if (ds && (ds.status === 'downloading' || ds.status === 'done')) return false;
+        return true;
+    });
+
+    item.isMultiSelectMode = false;
+    item.selectedItems.clear();
+    updateCard(cardId);
+
+    let subDir = '';
+    if (toDownload.length > 1) {
+        const nickname = item.nickname || (item.info && item.info.author && item.info.author.nickname) || '抖音用户';
+        const now = new Date();
+        const yyyy = now.getFullYear();
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const dd = String(now.getDate()).padStart(2, '0');
+        const hh = String(now.getHours()).padStart(2, '0');
+        const min = String(now.getMinutes()).padStart(2, '0');
+        const ss = String(now.getSeconds()).padStart(2, '0');
+        subDir = `${nickname}_${yyyy}${mm}${dd}_${hh}${min}${ss}`;
+    }
+    
+    for (const idx of toDownload) {
+        await downloadUserItem(cardId, idx, subDir);
+    }
+}
+
+async function downloadAllUserItems(cardId) {
+    const item = appState.items[cardId];
+    if (!item) return;
+
+    // 过滤出真正需要下载的条数
+    const toDownload = [];
+    for (let i = 0; i < item.userItems.length; i++) {
+        const uItem = item.userItems[i];
+        if (uItem.alreadyDownloaded || uItem.parseError) continue;
+        const ds = item.userDownloadStates[uItem.awemeId];
+        if (ds && (ds.status === 'downloading' || ds.status === 'done')) continue;
+        toDownload.push(i);
+    }
+
+    let subDir = '';
+    if (toDownload.length > 1) {
+        const nickname = item.nickname || (item.info && item.info.author && item.info.author.nickname) || '抖音用户';
+        const now = new Date();
+        const yyyy = now.getFullYear();
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const dd = String(now.getDate()).padStart(2, '0');
+        const hh = String(now.getHours()).padStart(2, '0');
+        const min = String(now.getMinutes()).padStart(2, '0');
+        const ss = String(now.getSeconds()).padStart(2, '0');
+        subDir = `${nickname}_${yyyy}${mm}${dd}_${hh}${min}${ss}`;
+    }
+
+    for (const idx of toDownload) {
+        await downloadUserItem(cardId, idx, subDir);
+    }
+}

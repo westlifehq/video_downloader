@@ -133,12 +133,31 @@ app.post('/api/parse', async (req, res) => {
             const realUrl = await douyin.resolveShareUrl(url);
             console.log(`[解析] 真实链接: ${realUrl}`);
 
-            // 2. 提取 video ID
-            const videoId = douyin.extractVideoId(realUrl);
-            console.log(`[解析] 视频 ID: ${videoId}`);
+            // 检查是否为用户主页链接
+            if (realUrl.includes('/user/') || realUrl.includes('/share/user/')) {
+                const secUidMatch = realUrl.match(/\/user\/([a-zA-Z0-9_\-\.]+)/);
+                if (!secUidMatch) {
+                    throw new Error('无法解析用户 ID (sec_uid)');
+                }
+                const secUid = secUidMatch[1];
+                info = {
+                    type: 'user',
+                    secUid: secUid,
+                    url: realUrl,
+                    title: '抖音用户主页',
+                    author: {
+                        nickname: '抖音用户',
+                        avatar: ''
+                    }
+                };
+            } else {
+                // 2. 提取 video ID
+                const videoId = douyin.extractVideoId(realUrl);
+                console.log(`[解析] 视频 ID: ${videoId}`);
 
-            // 3. 获取视频详情
-            info = await douyin.fetchVideoInfo(videoId);
+                // 3. 获取视频详情
+                info = await douyin.fetchVideoInfo(videoId);
+            }
         }
         
         console.log(`[解析] 成功! 标题: ${info.title}, 类型: ${info.type}`);
@@ -158,7 +177,7 @@ app.post('/api/parse', async (req, res) => {
  * POST /api/download — 开始下载视频
  */
 app.post('/api/download', async (req, res) => {
-    const { videoUrl, title, awemeId, type, images } = req.body;
+    const { videoUrl, title, awemeId, type, images, subDir } = req.body;
     let { platform } = req.body;
     const isImage = type === 'image';
 
@@ -170,10 +189,14 @@ app.post('/api/download', async (req, res) => {
         }
     }
 
-    console.log(`[下载] 收到请求: ${title}, 平台: ${platform || '未知'}, 类型: ${type}`);
+    console.log(`[下载] 收到请求: ${title}, 平台: ${platform || '未知'}, 类型: ${type}, 子文件夹: ${subDir || '无'}`);
     console.log(`[下载] URL: ${videoUrl || (images ? images[0] : '无')}`);
 
-    const downloadDir = getEffectiveDownloadDir();
+    let downloadDir = getEffectiveDownloadDir();
+    if (subDir) {
+        const safeSubDir = douyin.sanitizeFilename(subDir);
+        downloadDir = path.join(downloadDir, safeSubDir);
+    }
 
     // 确保下载目录存在
     if (!fs.existsSync(downloadDir)) {
@@ -990,6 +1013,145 @@ app.get('/api/schedule/logs', (req, res) => { res.json(readScheduleLog()); });
 app.post('/api/schedule/run', async (req, res) => {
     res.json({ success: true, message: '已触发定时同步' });
     runScheduledSync().catch(err => console.error('[定时同步] 手动触发执行出错:', err.message));
+});
+
+// 用户主页同步任务状态存储
+const userSyncTasks = new Map();
+
+/**
+ * POST /api/user/sync — 获取用户主页作品列表
+ */
+app.post('/api/user/sync', async (req, res) => {
+    const { secUid } = req.body;
+    const maxCount = req.body.maxCount || 50;
+    if (!secUid) return res.status(400).json({ error: '请提供 secUid' });
+
+    // 检查是否已有同步任务在进行
+    for (const task of userSyncTasks.values()) {
+        if (task.status === 'fetching') {
+            return res.status(409).json({ error: '已有用户同步任务进行中', taskId: task.id });
+        }
+    }
+
+    const taskId = uuidv4();
+    const task = {
+        id: taskId,
+        status: 'fetching',
+        phase: '正在获取用户作品...',
+        collected: 0,
+        maxCount,
+        items: [],
+        error: null,
+        startTime: Date.now(),
+        interrupted: false,
+        nickname: '抖音用户'
+    };
+    userSyncTasks.set(taskId, task);
+
+    res.json({ success: true, taskId });
+
+    try {
+        const result = await favorites.fetchUserPosts(secUid, maxCount, (collected, max, current) => {
+            task.collected = collected;
+            task.maxCount = max;
+            if (current && current.nickname) {
+                task.nickname = current.nickname;
+            }
+        }, () => task.interrupted);
+
+        const rawItems = result.items;
+        task.nickname = result.nickname;
+
+        if (rawItems.length === 0) {
+            task.status = 'done';
+            task.phase = '作品列表为空';
+            return;
+        }
+
+        const syncedData = favorites.getSyncedData();
+        const syncedIds = new Set(syncedData.ids || []);
+        const downloadDir = getEffectiveDownloadDir();
+
+        for (const rawItem of rawItems) {
+            try {
+                const info = douyin.normalizeVideoData(rawItem);
+                const awemeId = info.awemeId || '';
+                const isImage = info.type === 'image';
+                const safeName = douyin.sanitizeFilename(info.title || awemeId || 'douyin');
+                const fileName = isImage
+                    ? `[图集]_${safeName}`
+                    : `${safeName}_${awemeId || Date.now()}.mp4`;
+                const savePath = path.join(downloadDir, fileName);
+                const alreadyDownloaded = syncedIds.has(awemeId) || fs.existsSync(savePath);
+
+                task.items.push({
+                    type: info.type,
+                    videoUrl: info.videoUrl,
+                    images: info.images,
+                    title: info.title,
+                    author: info.author,
+                    cover: info.cover,
+                    awemeId,
+                    duration: info.duration,
+                    width: info.width,
+                    height: info.height,
+                    platform: 'douyin',
+                    alreadyDownloaded,
+                    fileName,
+                    filePath: savePath,
+                });
+            } catch (err) {
+                task.items.push({
+                    title: rawItem.desc || '未知',
+                    awemeId: rawItem.aweme_id || '',
+                    cover: '',
+                    parseError: err.message,
+                    alreadyDownloaded: false,
+                });
+            }
+        }
+
+        task.status = 'done';
+        task.phase = task.interrupted ? `已打断，获取到 ${task.items.length} 条作品` : `已获取 ${task.nickname} 的 ${task.items.length} 条作品`;
+        console.log(`[用户同步] ${task.phase}`);
+    } catch (err) {
+        task.status = 'error';
+        task.error = err.message;
+        task.phase = '获取作品列表失败';
+        console.error(`[用户同步] 错误: ${err.message}`);
+    }
+});
+
+/**
+ * POST /api/user/sync/stop — 打断同步任务
+ */
+app.post('/api/user/sync/stop', (req, res) => {
+    const { taskId } = req.body;
+    if (!taskId) return res.status(400).json({ error: '未提供 taskId' });
+    
+    const task = userSyncTasks.get(taskId);
+    if (!task) {
+        return res.status(404).json({ error: '任务不存在' });
+    }
+    
+    if (task.status === 'fetching') {
+        task.interrupted = true;
+        console.log(`[用户同步] 接收到打断信号 taskId=${taskId}`);
+        return res.json({ success: true, message: '打断信号已发送' });
+    }
+    
+    res.json({ success: false, message: '任务不在获取阶段，无法打断' });
+});
+
+/**
+ * GET /api/user/sync/:taskId — 查询用户同步任务进度
+ */
+app.get('/api/user/sync/:taskId', (req, res) => {
+    const task = userSyncTasks.get(req.params.taskId);
+    if (!task) {
+        return res.status(404).json({ error: '任务不存在' });
+    }
+    res.json(task);
 });
 
 // 启动服务器
