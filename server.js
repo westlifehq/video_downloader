@@ -14,9 +14,13 @@ function pressAnyKeyToExit() {
     console.log('\n================================');
     console.log('程序遇到错误，请截图发给开发者。');
     console.log('按任意键退出...');
-    process.stdin.setRawMode(true);
-    process.stdin.resume();
-    process.stdin.on('data', process.exit.bind(process, 1));
+    if (process.stdin.setRawMode) {
+        process.stdin.setRawMode(true);
+        process.stdin.resume();
+        process.stdin.on('data', process.exit.bind(process, 1));
+    } else {
+        process.exit(1);
+    }
 }
 
 process.on('uncaughtException', (err) => {

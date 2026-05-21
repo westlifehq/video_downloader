@@ -13,6 +13,7 @@ RUN npm ci --omit=dev
 COPY server.js .
 COPY lib/ ./lib/
 COPY public/ ./public/
+COPY routes/ ./routes/
 
 # 环境变量：让代码识别在 Docker 环境运行，且强制无头模式
 ENV IS_DOCKER=true
