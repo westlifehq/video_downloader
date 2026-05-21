@@ -1,0 +1,17 @@
+# Agent Skill Trigger Rules
+
+## 1. Skill Discovery & Proactive Check
+- Whenever the user asks for a task that is general or matches any of the categories below, **you must first list/search the local knowledge directory (`/Users/hq/.gemini/antigravity/knowledge/`)** to see if a matching skill is installed:
+  - Documentation/Summarization/Report -> `feishu-summary` / `summary-html` / `notebooklm`
+  - Frontend UI design/beautifying/layouts -> `frontend-design` / `html-to-image-export`
+  - Code Review/Refactoring/Quality -> `code-review` / `project-analyzer`
+  - Discovering/adding/creating skills -> `find-skills` / `skill-authoring-workflow` / `skill-creator`
+- If a matching skill is found, you **MUST** read the `SKILL.md` file within its `artifacts` subdirectory (e.g. `/Users/hq/.gemini/antigravity/knowledge/<skill-name>/artifacts/SKILL.md`) using the `view_file` tool with the parameter `IsSkillFile: true`.
+- You **MUST** strictly follow the instructions, design principles, templates, and commands specified in that skill file.
+
+## 2. Handling Typo and Semantic Ambiguity
+- When the user asks for an action that has potential ambiguity or typos (e.g. "飞牛文档" when they meant "飞书文档"), do not immediately assume the literal text if there's a highly matching skill in the local directory (e.g. `feishu-summary` for "飞书" or document summary).
+- Proactively search the knowledge directory for semantic keywords (e.g. search for "feishu", "lark", "summary", "report", "wiki" if they ask for document creation).
+
+## 3. Skill CLI Commands
+- When installing or managing skills, use `npx skills` commands (e.g. `npx skills check`, `npx skills update`, `npx skills find`, `npx skills add`).
