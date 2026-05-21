@@ -8,6 +8,34 @@ let appState = {
     pollTimers: {} // key: id, value: interval timer
 };
 
+// ── 绝对路径安全 ID 映射与 HTML 转义机制 ──
+const pathIdMap = new Map();
+function registerPath(filePath) {
+    if (!filePath) return '';
+    const id = 'path_' + Math.random().toString(36).substring(2, 11);
+    pathIdMap.set(id, filePath);
+    return id;
+}
+function getPathById(id) {
+    return pathIdMap.get(id) || '';
+}
+window.openHistoryFileById = function(id) {
+    openHistoryFile(getPathById(id));
+};
+window.deleteHistoryFileById = function(id, realIndex) {
+    deleteHistoryFile(getPathById(id), realIndex);
+};
+
+function escapeHTML(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 // ── 辅助函数：替换 innerHTML 并在渲染前后恢复滚动位置 ──
 function setHtmlAndRestoreScroll(el, html) {
     if (!el) return;
@@ -698,15 +726,16 @@ function loadHistory() {
         const realIndex = history.indexOf(item);
         const placeholderHtml = `<div class="history-thumb-placeholder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg></div>`;
         const thumbHtml = item.cover
-            ? `<img class="history-thumb" src="${item.cover}" alt="" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">` + `<div class="history-thumb-placeholder" style="display:none;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg></div>`
+            ? `<img class="history-thumb" src="${escapeHTML(item.cover)}" alt="" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">` + `<div class="history-thumb-placeholder" style="display:none;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg></div>`
             : placeholderHtml;
-        const authorStr = item.author ? `<span style="font-size:11px;color:var(--c-text-muted);">@${item.author}</span>` : '';
+        const authorStr = item.author ? `<span style="font-size:11px;color:var(--c-text-muted);">@${escapeHTML(item.author)}</span>` : '';
         const timeStr = item.time ? `<span style="font-size:11px;color:var(--c-text-muted);">${new Date(item.time).toLocaleString('zh-CN', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}</span>` : '';
+        const safePathId = registerPath(item.filePath);
         return `
       <div class="history-item">
         ${thumbHtml}
         <div class="history-info">
-          <span class="history-name" title="${item.filePath || ''}">${item.title || item.fileName}</span>
+          <span class="history-name" title="${escapeHTML(item.filePath || '')}">${escapeHTML(item.title || item.fileName)}</span>
           <div class="history-meta">
             ${authorStr}
             ${timeStr}
@@ -715,12 +744,12 @@ function loadHistory() {
           </div>
         </div>
         <div class="history-actions">
-          <button class="action-btn action-btn--open" onclick="openHistoryFile('${(item.filePath || '').replace(/\\/g, '\\\\')}')" title="在文件夹中显示">
+          <button class="action-btn action-btn--open" onclick="openHistoryFileById('${safePathId}')" title="在文件夹中显示">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
             </svg>
           </button>
-          <button class="action-btn action-btn--delete" onclick="deleteHistoryFile('${(item.filePath || '').replace(/\\/g, '\\\\')}', ${realIndex})" title="从磁盘删除文件">
+          <button class="action-btn action-btn--delete" onclick="deleteHistoryFileById('${safePathId}', ${realIndex})" title="从磁盘删除文件">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="3 6 5 6 21 6"></polyline>
               <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -1133,7 +1162,7 @@ function renderFavList() {
         html += '<div style="margin-top:12px">';
         html += errored.map(item => `<div class="fav-sync-item" style="opacity:0.5;padding:6px 12px">
             <svg class="fav-sync-item-status error" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            <span class="fav-sync-item-title">${item.title} (解析失败)</span>
+            <span class="fav-sync-item-title">${escapeHTML(item.title)} (解析失败)</span>
         </div>`).join('');
         html += '</div>';
     }
@@ -1144,7 +1173,7 @@ function renderFavList() {
 function renderFavItemCard(item, isDownloadedSection) {
     const idx = item._idx;
     const coverHtml = item.cover
-        ? `<img src="${item.cover}" style="width:40px;height:40px;border-radius:6px;object-fit:cover;flex-shrink:0" onerror="this.style.display='none'">`
+        ? `<img src="${escapeHTML(item.cover)}" style="width:40px;height:40px;border-radius:6px;object-fit:cover;flex-shrink:0" onerror="this.style.display='none'">`
         : '';
 
     const dState = favDownloadStates[item.awemeId];
@@ -1197,7 +1226,7 @@ function renderFavItemCard(item, isDownloadedSection) {
         </div>`;
     }
 
-    const authorHtml = item.author ? `<span style="font-size:11px;color:var(--c-text-muted)">@${item.author}</span>` : '';
+    const authorHtml = item.author ? `<span style="font-size:11px;color:var(--c-text-muted)">@${escapeHTML(item.author)}</span>` : '';
 
     const isSelected = favSelectedItems.has(idx);
     const checkboxHtml = isFavMultiSelectMode ? `
@@ -1215,7 +1244,7 @@ function renderFavItemCard(item, isDownloadedSection) {
         ${checkboxHtml}
         ${coverHtml}
         <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
-            <span class="fav-sync-item-title" title="${item.title}">${item.title}</span>
+            <span class="fav-sync-item-title" title="${escapeHTML(item.title)}">${escapeHTML(item.title)}</span>
             ${authorHtml}
         </div>
         ${actionHtml}
@@ -1594,7 +1623,7 @@ function renderLikedList() {
         html += '<div style="margin-top:12px">';
         html += errored.map(item => `<div class="fav-sync-item" style="opacity:0.5;padding:6px 12px">
             <svg class="fav-sync-item-status error" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            <span class="fav-sync-item-title">${item.title} (解析失败)</span>
+            <span class="fav-sync-item-title">${escapeHTML(item.title)} (解析失败)</span>
         </div>`).join('');
         html += '</div>';
     }
@@ -1605,7 +1634,7 @@ function renderLikedList() {
 function renderLikedItemCard(item, isDownloadedSection) {
     const idx = item._idx;
     const coverHtml = item.cover
-        ? `<img src="${item.cover}" style="width:40px;height:40px;border-radius:6px;object-fit:cover;flex-shrink:0" onerror="this.style.display='none'">`
+        ? `<img src="${escapeHTML(item.cover)}" style="width:40px;height:40px;border-radius:6px;object-fit:cover;flex-shrink:0" onerror="this.style.display='none'">`
         : '';
 
     const dState = likedDownloadStates[item.awemeId];
@@ -1658,7 +1687,7 @@ function renderLikedItemCard(item, isDownloadedSection) {
         </div>`;
     }
 
-    const authorHtml = item.author ? `<span style="font-size:11px;color:var(--c-text-muted)">@${item.author}</span>` : '';
+    const authorHtml = item.author ? `<span style="font-size:11px;color:var(--c-text-muted)">@${escapeHTML(item.author)}</span>` : '';
 
     const isSelected = likedSelectedItems.has(idx);
     const checkboxHtml = isLikedMultiSelectMode ? `
@@ -1675,7 +1704,7 @@ function renderLikedItemCard(item, isDownloadedSection) {
         ${checkboxHtml}
         ${coverHtml}
         <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
-            <span class="fav-sync-item-title" title="${item.title}">${item.title}</span>
+            <span class="fav-sync-item-title" title="${escapeHTML(item.title)}">${escapeHTML(item.title)}</span>
             ${authorHtml}
         </div>
         ${actionHtml}
@@ -2058,7 +2087,7 @@ function renderMsgList() {
 function renderMsgItemCard(item, isDownloadedSection) {
     const idx = item._idx;
     const coverHtml = item.cover
-        ? `<img src="${item.cover}" style="width:40px;height:40px;border-radius:6px;object-fit:cover;flex-shrink:0" onerror="this.style.display='none'">`
+        ? `<img src="${escapeHTML(item.cover)}" style="width:40px;height:40px;border-radius:6px;object-fit:cover;flex-shrink:0" onerror="this.style.display='none'">`
         : '';
 
     const dState = msgDownloadStates[item.awemeId];
@@ -2111,7 +2140,7 @@ function renderMsgItemCard(item, isDownloadedSection) {
         </div>`;
     }
 
-    const authorHtml = item.author ? `<span style="font-size:11px;color:var(--c-text-muted)">@${item.author}</span>` : '';
+    const authorHtml = item.author ? `<span style="font-size:11px;color:var(--c-text-muted)">@${escapeHTML(item.author)}</span>` : '';
 
     const isSelected = msgSelectedItems.has(idx);
     const checkboxHtml = isMsgMultiSelectMode ? `
@@ -2128,7 +2157,7 @@ function renderMsgItemCard(item, isDownloadedSection) {
         ${checkboxHtml}
         ${coverHtml}
         <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
-            <span class="fav-sync-item-title" title="${item.title}">${item.title}</span>
+            <span class="fav-sync-item-title" title="${escapeHTML(item.title)}">${escapeHTML(item.title)}</span>
             ${authorHtml}
         </div>
         ${actionHtml}
@@ -2427,7 +2456,7 @@ function renderUserItemCardHTML(cardId, uItem, isDownloadedSection) {
     const item = appState.items[cardId];
     const idx = uItem._idx;
     const coverHtml = uItem.cover
-        ? `<img src="${uItem.cover}" style="width:36px;height:36px;border-radius:6px;object-fit:cover;flex-shrink:0" onerror="this.style.display='none'">`
+        ? `<img src="${escapeHTML(uItem.cover)}" style="width:36px;height:36px;border-radius:6px;object-fit:cover;flex-shrink:0" onerror="this.style.display='none'">`
         : '';
 
     const dState = item.userDownloadStates[uItem.awemeId];
@@ -2492,8 +2521,8 @@ function renderUserItemCardHTML(cardId, uItem, isDownloadedSection) {
         ${checkboxHtml}
         ${coverHtml}
         <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px">
-            <span class="fav-sync-item-title" style="font-size:12px;line-height:1.3;" title="${uItem.title}">${uItem.title}</span>
-            <span style="font-size:10px;color:var(--c-text-muted)">@${uItem.author || item.nickname || '作者'}</span>
+            <span class="fav-sync-item-title" style="font-size:12px;line-height:1.3;" title="${escapeHTML(uItem.title)}">${escapeHTML(uItem.title)}</span>
+            <span style="font-size:10px;color:var(--c-text-muted)">@${escapeHTML(uItem.author || item.nickname || '作者')}</span>
         </div>
         ${actionHtml}
     </div>`;

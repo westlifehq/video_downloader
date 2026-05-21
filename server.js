@@ -1,7 +1,7 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
-const { exec } = require('child_process');
+const { exec, spawn } = require('child_process');
 const { v4: uuidv4 } = require('uuid');
 const cron = require('node-cron');
 const douyin = require('./lib/douyin');
@@ -57,6 +57,22 @@ function getEffectiveDownloadDir() {
         return config.downloadDir;
     }
     return path.join(require('os').homedir(), 'Downloads', 'douyin');
+}
+
+/**
+ * 校验路径安全性，防止目录穿越和操作下载根目录外部的文件
+ */
+function isPathSafe(targetPath) {
+    if (!targetPath) return false;
+    try {
+        const downloadDir = path.resolve(getEffectiveDownloadDir());
+        const resolvedPath = path.resolve(targetPath);
+        const relative = path.relative(downloadDir, resolvedPath);
+        // 不允许为空（即下载根目录本身，以防万一删了下载目录），不允许以 '..' 开头，不允许为绝对路径
+        return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative);
+    } catch (e) {
+        return false;
+    }
 }
 
 /**
@@ -307,30 +323,43 @@ app.post('/api/history/open', (req, res) => {
     const { filePath } = req.body;
     if (!filePath) return res.status(400).json({ error: '未提供文件路径' });
 
+    if (!isPathSafe(filePath)) {
+        return res.status(403).json({ error: '非法路径，禁止越界访问' });
+    }
+
     if (!fs.existsSync(filePath)) {
         return res.status(404).json({ error: '文件不存在' });
     }
 
     const platform = process.platform;
-    let command;
+    let cmd, args;
 
     if (platform === 'win32') {
-        // Windows: 使用 explorer /select, "path" 打开文件夹并选中文件
-        command = `explorer.exe /select,"${filePath}"`;
+        cmd = 'explorer.exe';
+        args = [`/select,${filePath}`];
     } else if (platform === 'darwin') {
-        // macOS: 使用 open -R 打开文件夹并选中文件
-        command = `open -R "${filePath}"`;
+        cmd = 'open';
+        args = ['-R', filePath];
     } else {
-        // Linux: 使用 xdg-open 打开父目录
-        command = `xdg-open "${path.dirname(filePath)}"`;
+        cmd = 'xdg-open';
+        args = [path.dirname(filePath)];
     }
 
-    exec(command, (err) => {
-        if (err) {
-            console.error(`[打开文件] 失败: ${err.message}`);
-            return res.status(500).json({ error: '文件夹打开失败' });
+    const child = spawn(cmd, args);
+    let hasError = false;
+
+    child.on('error', (err) => {
+        hasError = true;
+        console.error(`[打开文件] 失败: ${err.message}`);
+        if (!res.headersSent) {
+            res.status(500).json({ error: '文件夹打开失败' });
         }
-        res.json({ success: true });
+    });
+
+    process.nextTick(() => {
+        if (child.pid && !res.headersSent && !hasError) {
+            res.json({ success: true });
+        }
     });
 });
 
@@ -340,6 +369,10 @@ app.post('/api/history/open', (req, res) => {
 app.post('/api/history/delete', (req, res) => {
     const { filePath } = req.body;
     if (!filePath) return res.status(400).json({ error: '未提供文件路径' });
+
+    if (!isPathSafe(filePath)) {
+        return res.status(403).json({ error: '非法路径，禁止删除' });
+    }
 
     try {
         if (fs.existsSync(filePath)) {
