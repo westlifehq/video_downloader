@@ -269,7 +269,7 @@ function loadHistory() {
     if (authorSelect) {
         const currentAuthorVal = authorSelect.value;
         const authors = [...new Set(history.map(h => h.author).filter(Boolean))];
-        authorSelect.innerHTML = '<option value="">全部作者</option>' + authors.map(a => `<option value="${a}"${a === currentAuthorVal ? ' selected' : ''}>@${a}</option>`).join('');
+        authorSelect.innerHTML = '<option value="">全部作者</option>' + authors.map(a => `<option value="${escapeHTML(a)}"${a === currentAuthorVal ? ' selected' : ''}>@${escapeHTML(a)}</option>`).join('');
     }
 
     // Apply filters
@@ -552,7 +552,7 @@ function pollFavSync(taskId) {
                 panel.innerHTML = `
                     <div class="fav-sync-header">
                         <div>
-                            <span class="fav-sync-phase">${task.phase || '正在获取收藏列表...'}</span>
+                            <span class="fav-sync-phase">${escapeHTML(task.phase || '正在获取收藏列表...')}</span>
                             <span class="fav-sync-counter" style="margin-left:8px">已发现 ${task.collected || 0} 条</span>
                         </div>
                         <button class="btn btn--stop" style="padding:4px 10px;font-size:11px;border-radius:6px;color:white;border:none;cursor:pointer;" onclick="stopFavSync('${taskId}')">停止打断</button>
@@ -574,7 +574,7 @@ function pollFavSync(taskId) {
                 loadFavStatus();
 
                 if (task.status === 'error') {
-                    panel.innerHTML = `<div class="fav-login-hint" style="color:var(--c-error)">❌ ${task.error || '获取失败'}</div>`;
+                    panel.innerHTML = `<div class="fav-login-hint" style="color:var(--c-error)">❌ ${escapeHTML(task.error || '获取失败')}</div>`;
                     showToast('获取收藏列表失败', 'error');
                 } else {
                     favSyncedItems = task.items || [];
@@ -612,9 +612,11 @@ async function downloadFavItem(idx) {
         });
         if (!result.taskId) throw new Error('No taskId');
 
+        let favPollRetry = 0;
         const pollId = setInterval(async () => {
             try {
                 const task = await api('GET', `/api/download/${result.taskId}`);
+                favPollRetry = 0;
                 favDownloadStates[awemeId].progress = task.progress || 0;
 
                 if (task.status === 'done') {
@@ -633,11 +635,19 @@ async function downloadFavItem(idx) {
                     clearInterval(pollId);
                     favDownloadStates[awemeId].status = 'error';
                     renderFavList();
-                    showToast(`下载失败: ${task.error || '未知错误'}`, 'error');
+                    showToast(`下载失败: ${escapeHTML(task.error || '未知错误')}`, 'error');
                 } else {
                     renderFavList();
                 }
-            } catch (e) { /* ignore */ }
+            } catch (e) {
+                favPollRetry++;
+                if (favPollRetry >= 60) {
+                    clearInterval(pollId);
+                    favDownloadStates[awemeId].status = 'error';
+                    renderFavList();
+                    showToast('下载轮询超时，请检查网络', 'error');
+                }
+            }
         }, 500);
     } catch (err) {
         favDownloadStates[awemeId].status = 'error';
@@ -820,7 +830,7 @@ function pollLikedSync(taskId) {
                 panel.innerHTML = `
                     <div class="fav-sync-header">
                         <div>
-                            <span class="fav-sync-phase">${task.phase || '正在获取喜欢列表...'}</span>
+                            <span class="fav-sync-phase">${escapeHTML(task.phase || '正在获取喜欢列表...')}</span>
                             <span class="fav-sync-counter" style="margin-left:8px">已发现 ${task.collected || 0} 条</span>
                         </div>
                         <button class="btn btn--stop" style="padding:4px 10px;font-size:11px;border-radius:6px;color:white;border:none;cursor:pointer;" onclick="stopLikedSync('${taskId}')">停止打断</button>
@@ -842,7 +852,7 @@ function pollLikedSync(taskId) {
                 loadLikedStatus();
 
                 if (task.status === 'error') {
-                    panel.innerHTML = `<div class="fav-login-hint" style="color:var(--c-error)">❌ ${task.error || '获取失败'}</div>`;
+                    panel.innerHTML = `<div class="fav-login-hint" style="color:var(--c-error)">❌ ${escapeHTML(task.error || '获取失败')}</div>`;
                     showToast('获取喜欢列表失败', 'error');
                 } else {
                     likedSyncedItems = task.items || [];
@@ -880,9 +890,11 @@ async function downloadLikedItem(idx) {
         });
         if (!result.taskId) throw new Error('No taskId');
 
+        let likedPollRetry = 0;
         const pollId = setInterval(async () => {
             try {
                 const task = await api('GET', `/api/download/${result.taskId}`);
+                likedPollRetry = 0;
                 likedDownloadStates[awemeId].progress = task.progress || 0;
 
                 if (task.status === 'done') {
@@ -901,11 +913,19 @@ async function downloadLikedItem(idx) {
                     clearInterval(pollId);
                     likedDownloadStates[awemeId].status = 'error';
                     renderLikedList();
-                    showToast(`下载失败: ${task.error || '未知错误'}`, 'error');
+                    showToast(`下载失败: ${escapeHTML(task.error || '未知错误')}`, 'error');
                 } else {
                     renderLikedList();
                 }
-            } catch (e) { /* ignore */ }
+            } catch (e) {
+                likedPollRetry++;
+                if (likedPollRetry >= 60) {
+                    clearInterval(pollId);
+                    likedDownloadStates[awemeId].status = 'error';
+                    renderLikedList();
+                    showToast('下载轮询超时，请检查网络', 'error');
+                }
+            }
         }, 500);
     } catch (err) {
         likedDownloadStates[awemeId].status = 'error';
@@ -1088,7 +1108,7 @@ function pollMsgSync(taskId) {
                 panel.innerHTML = `
                     <div class="fav-sync-header">
                         <div>
-                            <span class="fav-sync-phase">${task.phase || '正在扫描私信...'}</span>
+                            <span class="fav-sync-phase">${escapeHTML(task.phase || '正在扫描私信...')}</span>
                             <span class="fav-sync-counter" style="margin-left:8px">已发现 ${task.collected || 0} 条</span>
                         </div>
                         <button class="btn btn--stop" style="padding:4px 10px;font-size:11px;border-radius:6px;color:white;border:none;cursor:pointer;" onclick="stopMsgSync('${taskId}')">停止打断</button>
@@ -1110,7 +1130,7 @@ function pollMsgSync(taskId) {
                 loadMsgStatus();
 
                 if (task.status === 'error') {
-                    panel.innerHTML = `<div class="fav-login-hint" style="color:var(--c-error)">❌ ${task.error || '获取失败'}</div>`;
+                    panel.innerHTML = `<div class="fav-login-hint" style="color:var(--c-error)">❌ ${escapeHTML(task.error || '获取失败')}</div>`;
                     showToast('获取私信视频列表失败', 'error');
                 } else {
                     msgSyncedItems = task.items || [];
@@ -1148,9 +1168,11 @@ async function downloadMsgItem(idx) {
         });
         if (!result.taskId) throw new Error('No taskId');
 
+        let msgPollRetry = 0;
         const pollId = setInterval(async () => {
             try {
                 const task = await api('GET', `/api/download/${result.taskId}`);
+                msgPollRetry = 0;
                 msgDownloadStates[awemeId].progress = task.progress || 0;
 
                 if (task.status === 'done') {
@@ -1169,11 +1191,19 @@ async function downloadMsgItem(idx) {
                     clearInterval(pollId);
                     msgDownloadStates[awemeId].status = 'error';
                     renderMsgList();
-                    showToast(`下载失败: ${task.error || '未知错误'}`, 'error');
+                    showToast(`下载失败: ${escapeHTML(task.error || '未知错误')}`, 'error');
                 } else {
                     renderMsgList();
                 }
-            } catch (e) { /* ignore */ }
+            } catch (e) {
+                msgPollRetry++;
+                if (msgPollRetry >= 60) {
+                    clearInterval(pollId);
+                    msgDownloadStates[awemeId].status = 'error';
+                    renderMsgList();
+                    showToast('下载轮询超时，请检查网络', 'error');
+                }
+            }
         }, 500);
     } catch (err) {
         msgDownloadStates[awemeId].status = 'error';
@@ -1416,10 +1446,10 @@ async function loadScheduleLogs() {
         }
         logPanel.innerHTML = logs.map(log => {
             const time = new Date(log.time).toLocaleString('zh-CN');
-            const modeLabel = { both: '收藏+喜欢', favorites: '仅收藏', liked: '仅喜欢' }[log.syncMode] || log.syncMode;
+            const modeLabel = { both: '收藏+喜欢', favorites: '仅收藏', liked: '仅喜欢' }[log.syncMode] || escapeHTML(log.syncMode);
             if (log.error) {
                 return `<div style="padding:6px 0;border-bottom:1px solid var(--c-border);">
-                    <span style="color:var(--c-error);">✕</span> ${time} [${modeLabel}] ${log.error}
+                    <span style="color:var(--c-error);">✕</span> ${time} [${modeLabel}] ${escapeHTML(log.error)}
                 </div>`;
             }
             const r = log.results || {};
@@ -1619,9 +1649,11 @@ async function downloadUserItem(cardId, idx, subDir = '') {
         });
         if (!result.taskId) throw new Error('No taskId');
 
+        let userPollRetry = 0;
         const pollId = setInterval(async () => {
             try {
                 const task = await api('GET', `/api/download/${result.taskId}`);
+                userPollRetry = 0;
                 if (!item.userDownloadStates[awemeId]) {
                     clearInterval(pollId);
                     return;
@@ -1644,11 +1676,21 @@ async function downloadUserItem(cardId, idx, subDir = '') {
                     clearInterval(pollId);
                     item.userDownloadStates[awemeId].status = 'error';
                     updateCard(cardId);
-                    showToast(`下载失败: ${task.error || '未知错误'}`, 'error');
+                    showToast(`下载失败: ${escapeHTML(task.error || '未知错误')}`, 'error');
                 } else {
                     updateCard(cardId);
                 }
-            } catch (e) { }
+            } catch (e) {
+                userPollRetry++;
+                if (userPollRetry >= 60) {
+                    clearInterval(pollId);
+                    if (item.userDownloadStates[awemeId]) {
+                        item.userDownloadStates[awemeId].status = 'error';
+                    }
+                    updateCard(cardId);
+                    showToast('下载轮询超时，请检查网络', 'error');
+                }
+            }
         }, 500);
     } catch (err) {
         item.userDownloadStates[awemeId].status = 'error';

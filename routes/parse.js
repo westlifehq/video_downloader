@@ -56,7 +56,7 @@ router.post('/parse', async (req, res) => {
         });
     } catch (err) {
         console.error(`[解析] 失败: ${err.message}`);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: '解析失败，请检查链接是否正确' });
     }
 });
 

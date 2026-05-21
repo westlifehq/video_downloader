@@ -48,9 +48,12 @@ app.use('/api', downloadRouter);
 app.use('/api', historyRouter);
 app.use('/api', syncRouter);
 
-// 启动服务器
-app.listen(PORT, () => {
+// 启动服务器 — 本地模式绑定 127.0.0.1，Docker/NAS 模式绑定 0.0.0.0
+const isDocker = require('fs').existsSync('/.dockerenv') || process.env.IS_DOCKER === 'true';
+const HOST = process.env.HOST || (isDocker ? '0.0.0.0' : '127.0.0.1');
+
+app.listen(PORT, HOST, () => {
     console.log(`\n🎬 抖音视频下载器已启动`);
-    console.log(`📍 http://localhost:${PORT}\n`);
+    console.log(`📍 http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}\n`);
     schedulerService.startScheduledTask();
 });

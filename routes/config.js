@@ -26,6 +26,19 @@ router.post('/config', async (req, res) => {
         return res.status(400).json({ error: '下载目录不能为空' });
     }
 
+    // P0 修复：校验 downloadDir 合法性，禁止设置为系统根目录或敏感路径
+    const path = require('path');
+    const resolved = path.resolve(downloadDir);
+    const dangerous = ['/', '/etc', '/usr', '/bin', '/sbin', '/var', '/tmp', '/root', '/sys', '/proc',
+                       'C:\\', 'C:\\Windows', 'C:\\Windows\\System32'];
+    if (dangerous.includes(resolved) || dangerous.includes(resolved.replace(/[\\/]+$/, ''))) {
+        return res.status(400).json({ error: '禁止将下载目录设置为系统根目录或敏感路径' });
+    }
+    // 必须为绝对路径
+    if (!path.isAbsolute(downloadDir)) {
+        return res.status(400).json({ error: '下载目录必须为绝对路径' });
+    }
+
     try {
         if (!fsSync.existsSync(downloadDir)) {
             const fs = require('fs').promises;
@@ -34,7 +47,7 @@ router.post('/config', async (req, res) => {
         await configHelper.writeConfig({ downloadDir });
         res.json({ success: true, downloadDir });
     } catch (err) {
-        res.status(500).json({ error: `目录创建失败: ${err.message}` });
+        res.status(500).json({ error: '目录创建失败' });
     }
 });
 
@@ -62,8 +75,15 @@ router.post('/schedule/config', async (req, res) => {
     if (syncMode && ['favorites', 'liked', 'both', 'messages', 'all'].includes(syncMode)) cfg.syncMode = syncMode;
     if (maxCount && Number.isInteger(maxCount) && maxCount > 0 && maxCount <= 500) cfg.maxCount = maxCount;
     if (triggerMode && ['fixed', 'random'].includes(triggerMode)) cfg.triggerMode = triggerMode;
-    if (rangeStart) cfg.rangeStart = rangeStart;
-    if (rangeEnd) cfg.rangeEnd = rangeEnd;
+    const timeFormatRegex = /^\d{1,2}:\d{2}$/;
+    if (rangeStart) {
+        if (!timeFormatRegex.test(rangeStart)) return res.status(400).json({ error: 'rangeStart 格式应为 HH:MM' });
+        cfg.rangeStart = rangeStart;
+    }
+    if (rangeEnd) {
+        if (!timeFormatRegex.test(rangeEnd)) return res.status(400).json({ error: 'rangeEnd 格式应为 HH:MM' });
+        cfg.rangeEnd = rangeEnd;
+    }
     
     await configHelper.writeScheduleConfig(cfg);
     schedulerService.startScheduledTask();

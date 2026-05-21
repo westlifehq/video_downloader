@@ -3,7 +3,7 @@
 > 🚀 一个基于 Node.js 构建的现代化、极简、高颜值的全平台视频内容解析及下载工具。
 
 ![UI Preview](https://img.shields.io/badge/Status-Active-success)
-![Version](https://img.shields.io/badge/Version-8.0.0-blue)
+![Version](https://img.shields.io/badge/Version-8.1.0-blue)
 ![Nodejs](https://img.shields.io/badge/Node.js-18.x-blue)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 
@@ -30,7 +30,17 @@
 
 以下内容为基于 `feat: add douyin liked sync support` 之后的持续迭代，方便老用户快速了解最近新增了什么：
 
-### 0. 🔐 安全性、稳定性与前端 XSS 防御升级 (v8.0.0)
+### 0. 🔐 安全性、稳定性与前端 XSS 防御升级 (v8.1.0)
+
+- **P0 安全修复 — 阻断任意文件删除攻击链**：对 `downloadDir` 配置写入增加危险路径黑名单与绝对路径强制校验，彻底阻止通过篡改下载目录绕过 `isPathSafe` 的攻击链。
+- **P0 安全修复 — 本地模式仅监听 127.0.0.1**：默认不再暴露全接口，Docker/NAS 环境自动保持 `0.0.0.0`。
+- **P0 安全修复 — 全站 XSS 防护加固**：`updateCard()`、轮询面板、历史下拉、定时日志等所有动态数据拼入 innerHTML 的位置统一用 `escapeHTML()` 转义；`secUid` 不再裸拼入 onclick 属性。
+- **P1 修复 — 移除 exec 命令注入**：`logout()` 移除 `rm -rf` fallback。
+- **P1 修复 — 竞态条件防护**：`saveSyncedIds`/`saveLikedIds`/`appendScheduleLog` 引入文件锁。
+- **P1 修复 — 浏览器泄漏/await 缺失/下载残留文件/错误泄露路径/轮询无上限**：全面修补。
+- 详见 [CHANGELOG.md](CHANGELOG.md)。
+
+### 0.1. 🔐 安全性、稳定性与前端 XSS 防御升级 (v8.0.0)
 
 - **Playwright 智能轮询等待**：将 `lib/douyin-favorites.js` 中 11 处固定 `waitForTimeout` 延时全部重构为响应式智能轮询等待，彻底避免无意义的死等，同步整体效率与耗时显著缩短 80% 以上。
 - **物理路径安全映射**：引入 `pathIdMap` 映射绝对路径为前端安全随机 ID，杜绝敏感的物理路径中由于单双引号等特殊字符导致前端 JS `onclick` 执行崩毁与跨站脚本执行的隐患。

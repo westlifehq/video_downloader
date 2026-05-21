@@ -28,7 +28,7 @@ router.post('/history/open', async (req, res) => {
         res.json({ success: true });
     } catch (err) {
         console.error(`[打开文件] 失败: ${err.message}`);
-        res.status(500).json({ error: err.message || '文件夹打开失败' });
+        res.status(500).json({ error: '文件夹打开失败' });
     }
 });
 
@@ -46,7 +46,7 @@ router.post('/history/delete', async (req, res) => {
         res.json({ success: true });
     } catch (err) {
         console.error(`[删除文件] 失败: ${err.message}`);
-        res.status(500).json({ error: err.message || '删除失败' });
+        res.status(500).json({ error: '删除失败' });
     }
 });
 

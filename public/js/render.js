@@ -49,8 +49,8 @@ function updateCard(id) {
         setHtmlAndRestoreScroll(el, `
             <div class="video-card" style="border-color: rgba(248, 113, 113, 0.4);">
                 <div class="video-meta">
-                    <p style="color:var(--c-error); font-weight:500;">解析失败: ${item.error}</p>
-                    <p style="font-size:12px; color:var(--c-text-muted); margin-top:8px; word-break:break-all;">${item.url}</p>
+                    <p style="color:var(--c-error); font-weight:500;">解析失败: ${escapeHTML(item.error)}</p>
+                    <p style="font-size:12px; color:var(--c-text-muted); margin-top:8px; word-break:break-all;">${escapeHTML(item.url)}</p>
                 </div>
             </div>`);
         return;
@@ -83,7 +83,7 @@ function updateCard(id) {
                   <div style="display:flex; align-items:center; gap:8px;">
                     <div class="author-avatar" style="width:36px; height:36px; border-radius:50%; background:var(--c-primary); display:flex; align-items:center; justify-content:center; font-weight:bold; color:white; font-size:18px;">👤</div>
                     <div>
-                      <h3 style="font-size:15px; font-weight:600; color:white; margin:0;">${item.nickname || info.author?.nickname || '抖音用户'}</h3>
+                      <h3 style="font-size:15px; font-weight:600; color:white; margin:0;">${escapeHTML(item.nickname || info.author?.nickname || '抖音用户')}</h3>
                       <p style="font-size:12px; color:var(--c-text-muted); margin:0;">检测到这是一个抖音用户主页，可以同步并批量下载其作品或公开喜欢视频。</p>
                     </div>
                   </div>
@@ -100,7 +100,7 @@ function updateCard(id) {
                     <option value="200" ${item.syncMaxCount === 200 ? 'selected' : ''}>最新 200 条</option>
                     <option value="500" ${item.syncMaxCount === 500 ? 'selected' : ''}>最新 500 条</option>
                   </select>
-                  <button class="btn btn--sync" style="flex:1; height:36px; border-radius:6px;" onclick="handleUserSync('${id}', '${info.secUid}')">提取列表</button>
+                  <button class="btn btn--sync" style="flex:1; height:36px; border-radius:6px;" onclick="handleUserSync('${escapeHTML(id)}', '${escapeHTML(info.secUid)}')">提取列表</button>
                 </div>
               </div>
             `);
@@ -111,9 +111,9 @@ function updateCard(id) {
             setHtmlAndRestoreScroll(el, `
               <div class="video-card user-sync-card" style="flex-direction:column; align-items:stretch;">
                 <div class="fav-sync-header" style="margin-bottom:8px">
-                  <span class="fav-sync-phase" style="font-size:13px; font-weight:600;">${item.syncPhase || '正在同步...'}</span>
+                  <span class="fav-sync-phase" style="font-size:13px; font-weight:600;">${escapeHTML(item.syncPhase || '正在同步...')}</span>
                   <span class="fav-sync-counter" style="margin-left:8px; font-size:12px; color:var(--c-text-muted);">已发现 ${item.syncCollected || 0} 条</span>
-                  <button class="btn btn--stop" style="padding:4px 10px; font-size:11px; border-radius:6px; color:white; border:none; cursor:pointer;" onclick="stopUserSync('${id}')">停止打断</button>
+                  <button class="btn btn--stop" style="padding:4px 10px; font-size:11px; border-radius:6px; color:white; border:none; cursor:pointer;" onclick="stopUserSync('${escapeHTML(id)}')">停止打断</button>
                 </div>
                 <div class="fav-sync-progress" style="height:4px; background:var(--c-border); border-radius:2px; overflow:hidden; margin-top:8px;">
                   <div class="fav-sync-progress-fill indeterminate" style="width:30%"></div>
@@ -127,10 +127,10 @@ function updateCard(id) {
             setHtmlAndRestoreScroll(el, `
               <div class="video-card user-sync-card" style="flex-direction:column; align-items:stretch; border-color: rgba(248, 113, 113, 0.4);">
                 <h3 style="font-size:14px; font-weight:600; color:var(--c-error); margin:0 0 8px 0;">获取失败</h3>
-                <p style="font-size:12px; color:var(--c-text-muted); margin:0 0 12px 0;">${item.error || '出错了，请检查本地网络或登录状态'}</p>
+                <p style="font-size:12px; color:var(--c-text-muted); margin:0 0 12px 0;">${escapeHTML(item.error || '出错了，请检查本地网络或登录状态')}</p>
                 <div style="display:flex; gap:8px;">
-                  <button class="btn btn--secondary" style="flex:1; height:32px; border-radius:6px; font-size:12px;" onclick="resetUserSync('${id}')">返回重新设置</button>
-                  <button class="btn btn--sync" style="flex:1; height:32px; border-radius:6px; font-size:12px;" onclick="handleUserSync('${id}', '${info.secUid}')">重试同步</button>
+                  <button class="btn btn--secondary" style="flex:1; height:32px; border-radius:6px; font-size:12px;" onclick="resetUserSync('${escapeHTML(id)}')">返回重新设置</button>
+                  <button class="btn btn--sync" style="flex:1; height:32px; border-radius:6px; font-size:12px;" onclick="handleUserSync('${escapeHTML(id)}', '${escapeHTML(info.secUid)}')">重试同步</button>
                 </div>
               </div>
             `);
@@ -163,7 +163,7 @@ function updateCard(id) {
                   <div style="display:flex; align-items:center; gap:8px; min-width:0;">
                     <div class="author-avatar" style="width:32px; height:32px; border-radius:50%; background:var(--c-primary); display:flex; align-items:center; justify-content:center; font-weight:bold; color:white; font-size:16px; flex-shrink:0;">👤</div>
                     <div style="min-width:0;">
-                      <h3 style="font-size:14px; font-weight:600; color:white; margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${item.nickname || info.author?.nickname}">${item.nickname || info.author?.nickname || '抖音用户'}</h3>
+                      <h3 style="font-size:14px; font-weight:600; color:white; margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHTML(item.nickname || info.author?.nickname)}">${escapeHTML(item.nickname || info.author?.nickname || '抖音用户')}</h3>
                       <p style="font-size:11px; color:var(--c-text-muted); margin:0;">主页${item.syncType === 'like' ? '喜欢' : (item.syncType === 'favorite' ? '收藏' : '作品')}同步 (发现 ${item.userItems.length} 条)</p>
                     </div>
                   </div>
@@ -316,19 +316,19 @@ function updateCard(id) {
     setHtmlAndRestoreScroll(el, `
       <div class="video-card">
         <div class="video-cover-wrap">
-          <img class="video-cover" src="${info.cover || ''}" alt="封面">
+          <img class="video-cover" src="${escapeHTML(info.cover || '')}" alt="封面">
           ${durationHtml}
         </div>
         <div class="video-meta">
-          <h2 class="video-title" title="${info.title}">${info.title}</h2>
+          <h2 class="video-title" title="${escapeHTML(info.title)}">${escapeHTML(info.title)}</h2>
           <div class="video-author">
             <span class="author-label">作者</span>
-            <span>${info.author}</span>
+            <span>${escapeHTML(info.author)}</span>
           </div>
           <div class="video-specs">
             ${resHtml}
           </div>
-          <button class="btn btn--download" onclick="handleDownload('${id}')" ${btnDisabled ? 'disabled' : ''}>
+          <button class="btn btn--download" onclick="handleDownload('${escapeHTML(id)}')" ${btnDisabled ? 'disabled' : ''}>
             <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
               <polyline points="7 10 12 15 17 10"/>

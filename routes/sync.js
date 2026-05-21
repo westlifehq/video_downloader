@@ -469,6 +469,10 @@ router.post('/user/sync', async (req, res) => {
     const tabLabel = tabType === 'like' ? '喜欢视频' : (tabType === 'favorite' ? '收藏视频' : '作品');
 
     if (!secUid) return res.status(400).json({ error: '请提供 secUid' });
+    // secUid 格式校验：应为字母数字下划线横线点组成
+    if (!/^[a-zA-Z0-9_\-\.]{10,}$/.test(secUid)) {
+        return res.status(400).json({ error: 'secUid 格式不正确' });
+    }
 
     const tasks = taskManager.getAllTasks('userSync');
     for (const task of tasks) {
