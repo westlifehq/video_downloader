@@ -1024,6 +1024,9 @@ const userSyncTasks = new Map();
 app.post('/api/user/sync', async (req, res) => {
     const { secUid } = req.body;
     const maxCount = req.body.maxCount || 50;
+    const tabType = req.body.tabType || 'post'; // post, like 或 favorite
+    const tabLabel = tabType === 'like' ? '喜欢视频' : (tabType === 'favorite' ? '收藏视频' : '作品');
+
     if (!secUid) return res.status(400).json({ error: '请提供 secUid' });
 
     // 检查是否已有同步任务在进行
@@ -1037,9 +1040,10 @@ app.post('/api/user/sync', async (req, res) => {
     const task = {
         id: taskId,
         status: 'fetching',
-        phase: '正在获取用户作品...',
+        phase: `正在获取用户${tabLabel}...`,
         collected: 0,
         maxCount,
+        tabType,
         items: [],
         error: null,
         startTime: Date.now(),
@@ -1057,14 +1061,14 @@ app.post('/api/user/sync', async (req, res) => {
             if (current && current.nickname) {
                 task.nickname = current.nickname;
             }
-        }, () => task.interrupted);
+        }, () => task.interrupted, tabType);
 
         const rawItems = result.items;
         task.nickname = result.nickname;
 
         if (rawItems.length === 0) {
             task.status = 'done';
-            task.phase = '作品列表为空';
+            task.phase = `${tabLabel}列表为空`;
             return;
         }
 
@@ -1112,12 +1116,12 @@ app.post('/api/user/sync', async (req, res) => {
         }
 
         task.status = 'done';
-        task.phase = task.interrupted ? `已打断，获取到 ${task.items.length} 条作品` : `已获取 ${task.nickname} 的 ${task.items.length} 条作品`;
+        task.phase = task.interrupted ? `已打断，获取到 ${task.items.length} 条${tabLabel}` : `已获取 ${task.nickname} 的 ${task.items.length} 条${tabLabel}`;
         console.log(`[用户同步] ${task.phase}`);
     } catch (err) {
         task.status = 'error';
         task.error = err.message;
-        task.phase = '获取作品列表失败';
+        task.phase = `获取${tabLabel}列表失败`;
         console.error(`[用户同步] 错误: ${err.message}`);
     }
 });

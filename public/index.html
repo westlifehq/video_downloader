@@ -2,87 +2,138 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Video Downloader</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>抖音视频下载器</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@700;800&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css?v=20260520">
 </head>
 <body>
-  <!-- Mesh gradient background -->
-  <div class="mesh-bg"></div>
 
-  <!-- Top Nav -->
-  <nav class="top-nav">
-    <div class="nav-brand" aria-label="Video Downloader">
-      <svg class="brand-mark" viewBox="0 0 96 96" role="img" aria-hidden="true">
-        <defs>
-          <linearGradient id="folderBack" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stop-color="#5f7cff" />
-            <stop offset="100%" stop-color="#7c3aed" />
-          </linearGradient>
-          <linearGradient id="folderFront" x1="0%" y1="100%" x2="100%" y2="0%">
-            <stop offset="0%" stop-color="#4f8cff" />
-            <stop offset="100%" stop-color="#d98dfc" />
-          </linearGradient>
-          <linearGradient id="arrowFill" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stop-color="#ffffff" />
-            <stop offset="100%" stop-color="#e7ecff" />
-          </linearGradient>
-          <filter id="brandGlow" x="-30%" y="-30%" width="160%" height="160%">
-            <feGaussianBlur stdDeviation="2.2" result="blur" />
-            <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-        </defs>
-        <path d="M16 24h24l7 8h30c7 0 12 5 12 12v7H16z" fill="url(#folderBack)" opacity="0.9" filter="url(#brandGlow)" />
-        <path d="M12 37h28l7 7h33c7 0 12 5 12 12v13c0 9-7 16-16 16H21C12 85 5 78 5 69V49c0-7 5-12 12-12z" fill="url(#folderFront)" stroke="rgba(255,255,255,0.6)" stroke-width="2" filter="url(#brandGlow)" />
-        <path d="M49 31v20.5l7.5-7.2c2.3-2.2 6-2.2 8.3 0 2.4 2.3 2.4 6.1 0 8.4L47.8 69.4c-2.3 2.2-6 2.2-8.3 0L22.7 52.7c-2.4-2.3-2.4-6.1 0-8.4 2.3-2.2 6-2.2 8.3 0l7.5 7.2V31c0-3.5 2.8-6.3 6.3-6.3h2c3.4 0 6.2 2.8 6.2 6.3z" fill="url(#arrowFill)" stroke="rgba(137,149,255,0.45)" stroke-width="1.5" />
-      </svg>
+  <!-- Desktop Sidebar Navigation (Hidden on Mobile) -->
+  <div id="sidebar">
+    <div class="brand">
+      <div class="brand-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" width="22" height="22">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+      </div>
+      <span class="brand-logo-text">DY DOWN</span>
     </div>
-    <div class="nav-links">
-      <a href="#" class="nav-link active"><span class="material-symbols-outlined">download</span><span>下载</span></a>
-      <a href="#" class="nav-link" onclick="event.preventDefault();switchSyncTab('fav');document.getElementById('syncSection').scrollIntoView({behavior:'smooth'})"><span class="material-symbols-outlined">sync</span><span>同步</span></a>
-      <a href="#" class="nav-link" onclick="event.preventDefault();document.getElementById('historySection').scrollIntoView({behavior:'smooth'})"><span class="material-symbols-outlined">history</span><span>历史</span></a>
-      <a href="#" class="nav-link" onclick="event.preventDefault();openSettingsSection()"><span class="material-symbols-outlined">settings</span><span>设置</span></a>
+
+    <ul class="menu-list">
+      <li class="menu-item active" onclick="switchMainPanel('parser')">
+        <span class="material-symbols-outlined">download</span>
+        <span>链接解析器</span>
+      </li>
+      <li class="menu-item" onclick="switchMainPanel('sync')">
+        <span class="material-symbols-outlined">sync</span>
+        <span>主页同步</span>
+      </li>
+      <li class="menu-item" onclick="switchMainPanel('schedule')">
+        <span class="material-symbols-outlined">schedule</span>
+        <span>自动定时任务</span>
+      </li>
+      <li class="menu-item" onclick="switchMainPanel('history')">
+        <span class="material-symbols-outlined">history</span>
+        <span>下载历史</span>
+      </li>
+      <li class="menu-item" onclick="switchMainPanel('settings')">
+        <span class="material-symbols-outlined">settings</span>
+        <span>系统设置</span>
+      </li>
+    </ul>
+
+    <div class="sidebar-status">
+      <div class="status-dot-row">
+        <span>绑定状态</span>
+        <span class="status-badge" id="sidebarSyncStatus"><span class="dot" style="background:#ef4444; box-shadow: 0 0 8px #ef4444;"></span>未登录</span>
+      </div>
+      <div class="status-dot-row">
+        <span>服务端口</span>
+        <span class="status-badge"><span class="dot dot--active"></span>Port 3000</span>
+      </div>
     </div>
-    <div class="nav-actions">
-      <span class="badge" id="syncBadge" style="display:none"><span class="badge-dot"></span><span id="syncBadgeText">已登录</span></span>
-      <button class="nav-avatar" id="syncAccountBtn" onclick="handleFavAccount()"><span class="material-symbols-outlined">account_circle</span></button>
-    </div>
+  </div>
+
+  <!-- Mobile Bottom Navigation Bar (Hidden on Desktop) -->
+  <nav class="bottom-nav">
+    <a href="#" class="bottom-nav-item active" onclick="event.preventDefault(); switchMainPanel('parser')">
+      <span class="material-symbols-outlined">download</span>
+      <span>解析</span>
+    </a>
+    <a href="#" class="bottom-nav-item" onclick="event.preventDefault(); switchMainPanel('sync')">
+      <span class="material-symbols-outlined">sync</span>
+      <span>同步</span>
+    </a>
+    <a href="#" class="bottom-nav-item" onclick="event.preventDefault(); switchMainPanel('schedule')">
+      <span class="material-symbols-outlined">schedule</span>
+      <span>定时</span>
+    </a>
+    <a href="#" class="bottom-nav-item" onclick="event.preventDefault(); switchMainPanel('history')">
+      <span class="material-symbols-outlined">history</span>
+      <span>历史</span>
+    </a>
+    <a href="#" class="bottom-nav-item" onclick="event.preventDefault(); switchMainPanel('settings')">
+      <span class="material-symbols-outlined">settings</span>
+      <span>设置</span>
+    </a>
   </nav>
 
-  <main class="container">
-    <!-- Hero: URL Input -->
-    <section class="glass-panel hero-panel">
-      <h2 class="hero-title">粘贴链接</h2>
-      <p class="hero-subtitle">支持抖音、小红书等平台，无水印原画下载</p>
-      <div class="input-wrapper">
-        <span class="material-symbols-outlined input-icon">link</span>
-        <textarea id="urlInput" class="url-input" placeholder="https://..." autocomplete="off" spellcheck="false" rows="1" oninput="handleInputResize(this)"></textarea>
-        <button id="clearBtn" class="btn-clear" onclick="clearInput()" title="清空" style="display:none">
-          <span class="material-symbols-outlined">close</span>
-        </button>
+  <!-- Main Content Workspace -->
+  <main id="main-content">
+    
+    <!-- Top Header -->
+    <div class="page-header">
+      <div class="page-title-section">
+        <h1 id="page-display-title">链接解析下载</h1>
+        <p id="page-display-desc">粘贴并解析包含抖音、小红书的分享短链或原始链接</p>
       </div>
-      <button id="parseBtn" class="btn btn--primary btn--hero" onclick="handleParse()">
-        <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1">download</span>
-        <span class="btn-text">解析下载</span>
-        <span class="btn-loader" style="display:none"></span>
-      </button>
-    </section>
+      <div class="header-actions">
+        <!-- Original account components used by app.js (placed neatly here) -->
+        <span class="badge" id="syncBadge" style="display:none"><span class="badge-dot"></span><span id="syncBadgeText">已登录</span></span>
+        <button class="nav-avatar" id="syncAccountBtn" onclick="handleFavAccount()"><span class="material-symbols-outlined">account_circle</span></button>
 
-    <div id="errorMsg" class="error-msg" style="display:none"></div>
-    <div id="resultsContainer" class="results-container"></div>
+        <div class="path-display">
+          <span class="material-symbols-outlined" style="font-size: 14px;">folder</span>
+          <span id="headerPathText">/downloads</span>
+        </div>
+      </div>
+    </div>
 
-    <!-- 抖音同步 -->
-    <section class="glass-panel" id="syncSection">
+    <!-- ── TAB: PARSER WRAPPER ── -->
+    <div id="panel-parser" class="tab-content-panel active">
+      <section class="glass-panel">
+        <div class="form-row" style="margin-bottom: 12px;">
+          <span style="font-size:13px; font-weight:500; color:var(--text-muted);">输入链接 (支持多行批量输入)</span>
+        </div>
+        <div class="input-wrapper">
+          <span class="material-symbols-outlined input-icon">link</span>
+          <textarea id="urlInput" class="url-input" placeholder="在此粘贴抖音视频链接、图文链接，或用户主页名片、网页链接...&#10;例：https://v.douyin.com/xxxx/" autocomplete="off" spellcheck="false" rows="2" oninput="handleInputResize(this)"></textarea>
+          <button id="clearBtn" class="btn-clear" onclick="clearInput()" title="清空" style="display:none">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <button id="parseBtn" class="btn btn--primary btn--hero" onclick="handleParse()">
+          <span class="material-symbols-outlined btn-icon" style="font-variation-settings:'FILL' 1">download</span>
+          <span class="btn-text">立即提取内容</span>
+          <span class="btn-loader" style="display:none"></span>
+        </button>
+      </section>
+
+      <div id="errorMsg" class="error-msg" style="display:none"></div>
+      <div id="resultsContainer" class="results-container"></div>
+    </div>
+
+    <!-- ── TAB: SYNC PANEL (bookmarks, liked, messages, schedule, auth) ── -->
+    <section class="glass-panel tab-content-panel" id="syncSection" style="display:none">
       <div class="card-header">
         <div class="card-header-left">
           <span class="material-symbols-outlined card-icon">sync</span>
-          <span class="card-title">抖音同步</span>
+          <span class="card-title">同步选项</span>
         </div>
         <div class="card-actions">
           <button class="btn btn--ghost-sm" id="syncAccountBtn2" onclick="handleFavAccount()"><span id="favAccountBtnText" class="btn-ghost-text">登录</span></button>
@@ -90,11 +141,11 @@
       </div>
 
       <div class="sync-tabs">
-        <button class="sync-tab active" data-tab="fav" onclick="switchSyncTab('fav')"><span class="material-symbols-outlined">bookmark</span>收藏</button>
-        <button class="sync-tab" data-tab="liked" onclick="switchSyncTab('liked')"><span class="material-symbols-outlined">favorite</span>喜欢</button>
-        <button class="sync-tab" data-tab="messages" onclick="switchSyncTab('messages')"><span class="material-symbols-outlined">chat</span>私信</button>
-        <button class="sync-tab" data-tab="schedule" onclick="switchSyncTab('schedule')"><span class="material-symbols-outlined">schedule</span>定时</button>
-        <button class="sync-tab" data-tab="auth" onclick="switchSyncTab('auth')"><span class="material-symbols-outlined">key</span>凭证</button>
+        <button class="sync-tab active" data-tab="fav" onclick="switchSyncTab('fav')"><span class="material-symbols-outlined">bookmark</span>收藏夹</button>
+        <button class="sync-tab" data-tab="liked" onclick="switchSyncTab('liked')"><span class="material-symbols-outlined">favorite</span>喜欢作品</button>
+        <button class="sync-tab" data-tab="messages" onclick="switchSyncTab('messages')"><span class="material-symbols-outlined">chat</span>私信扫描</button>
+        <button class="sync-tab" data-tab="schedule" onclick="switchSyncTab('schedule')" style="display:none;"><span class="material-symbols-outlined">schedule</span>定时</button>
+        <button class="sync-tab" data-tab="auth" onclick="switchSyncTab('auth')"><span class="material-symbols-outlined">key</span>凭证绑定</button>
       </div>
 
       <!-- Tab: 收藏 -->
@@ -130,16 +181,17 @@
         <div id="msgSyncPanel" class="sync-panel" style="display:none"></div>
       </div>
 
-      <!-- Tab: 定时 -->
+      <!-- Tab: 定时 (We hide it inside sync tabs but it remains structurally the same) -->
       <div class="sync-tab-content" id="tabSchedule">
         <div class="schedule-form">
-          <div class="form-row"><label>启用</label><label class="switch"><input type="checkbox" id="scheduleEnabled" onchange="saveScheduleConfig()"><span class="slider"></span></label></div>
+          <div class="form-row"><label>启用自动定时同步</label><label class="switch"><input type="checkbox" id="scheduleEnabled" onchange="saveScheduleConfig()"><span class="slider"></span></label></div>
           <div class="form-row"><label>触发模式</label>
             <select id="scheduleTriggerMode" onchange="onTriggerModeChange()" class="form-select">
               <option value="fixed">固定时间</option>
               <option value="random">随机时段（防风控）</option>
             </select>
           </div>
+
           <div class="form-row" id="scheduleFixedRow"><label>执行时间</label><input type="time" id="scheduleTime" value="00:00" class="form-input form-input--time"></div>
           <div class="form-row" id="scheduleRandomRow" style="display:none;"><label>随机区间</label>
             <div class="time-range"><input type="time" id="scheduleRangeStart" value="00:00" class="form-input form-input--time"><span>—</span><input type="time" id="scheduleRangeEnd" value="06:00" class="form-input form-input--time"></div>
@@ -155,9 +207,9 @@
           </div>
           <div class="form-row"><label>最大条数</label><input type="number" id="scheduleMaxCount" value="50" min="1" max="500" class="form-input" style="width:72px;"></div>
           <div class="form-actions">
-            <button class="btn btn--primary btn--sm" onclick="saveScheduleConfig()"><span class="material-symbols-outlined btn-icon">save</span>保存</button>
+            <button class="btn btn--primary btn--sm" onclick="saveScheduleConfig()"><span class="material-symbols-outlined btn-icon">save</span>保存配置</button>
             <button class="btn btn--primary btn--sm" onclick="triggerScheduleNow()"><span class="material-symbols-outlined btn-icon">play_arrow</span>立即执行</button>
-            <button class="btn btn--ghost-sm" onclick="loadScheduleLogs()"><span class="material-symbols-outlined btn-icon">description</span>日志</button>
+            <button class="btn btn--ghost-sm" onclick="loadScheduleLogs()"><span class="material-symbols-outlined btn-icon">description</span>查看日志</button>
           </div>
           <div id="scheduleLogPanel" class="schedule-log" style="display:none;"></div>
         </div>
@@ -168,8 +220,8 @@
         <div class="auth-form">
           <p class="auth-hint">粘贴抖音 <code>sessionid</code> Cookie 完成登录绑定</p>
           <div class="input-wrapper input-wrapper--auth">
-            <span class="material-symbols-outlined input-icon">key</span>
-            <input type="text" id="cookieInput" class="form-input form-input--auth" placeholder="sessionid 值…" autocomplete="off" spellcheck="false">
+            <span class="material-symbols-outlined input-icon" style="margin-right:0;">key</span>
+            <input type="text" id="cookieInput" class="form-input form-input--auth" placeholder="sessionid 值…" autocomplete="off" spellcheck="false" style="border:none;background:transparent;padding-left:10px;">
           </div>
           <button id="cookieSubmitBtn" class="btn btn--primary btn--sm" onclick="handleCookieSubmit()" style="width:100%;margin-top:12px;">绑定凭证</button>
           <details class="auth-help">
@@ -184,66 +236,217 @@
       </div>
     </section>
 
-    <!-- 下载历史 -->
-    <section class="glass-panel" id="historySection" style="display:none">
-      <div class="card-header">
-        <div class="card-header-left">
-          <span class="material-symbols-outlined card-icon">history</span>
-          <span class="card-title">下载历史</span>
-        </div>
-        <button class="btn btn--ghost-sm" onclick="clearHistory()">清空</button>
+    <!-- ── TAB: HISTORY WRAPPER ── -->
+    <div id="panel-history" class="tab-content-panel" style="display:none;">
+      <!-- History empty placeholder -->
+      <div id="history-empty-state" class="glass-panel" style="display:none; flex-direction:column; align-items:center; justify-content:center; padding:60px 20px; text-align:center;">
+        <span class="material-symbols-outlined" style="font-size:48px; color:var(--text-muted); margin-bottom:16px;">history</span>
+        <h3 style="font-size:16px; font-weight:600; margin-bottom:6px;">暂无下载历史</h3>
+        <p style="font-size:13px; color:var(--text-muted);">您成功下载的视频或图集将会保存在这里</p>
       </div>
-      <div class="history-filters" id="historyFilters" style="display:none;">
-        <input type="text" id="historyFilterKeyword" placeholder="搜索…" oninput="applyHistoryFilter()" class="form-input form-input--sm">
-        <select id="historyFilterAuthor" onchange="applyHistoryFilter()" class="form-select form-select--sm"><option value="">全部作者</option></select>
-        <select id="historyFilterDate" onchange="applyHistoryFilter()" class="form-select form-select--sm">
-          <option value="">全部时间</option><option value="today">今天</option><option value="week">7天</option><option value="month">30天</option>
-        </select>
-      </div>
-      <div id="historyList" class="history-list"></div>
-    </section>
 
-    <!-- 设置 -->
-    <section class="glass-panel" id="settingsSection">
+      <!-- Original History panel managed by app.js -->
+      <section class="glass-panel" id="historySection" style="display:none; margin-bottom:0;">
+        <div class="card-header">
+          <div class="card-header-left">
+            <span class="material-symbols-outlined card-icon">history</span>
+            <span class="card-title">下载历史</span>
+          </div>
+          <button class="btn btn--ghost-sm" onclick="clearHistory()">清空</button>
+        </div>
+        <div class="history-filters" id="historyFilters" style="display:none;">
+          <input type="text" id="historyFilterKeyword" placeholder="搜索文件或作者…" oninput="applyHistoryFilter()" class="form-input form-input--sm">
+          <select id="historyFilterAuthor" onchange="applyHistoryFilter()" class="form-select form-select--sm"><option value="">全部作者</option></select>
+          <select id="historyFilterDate" onchange="applyHistoryFilter()" class="form-select form-select--sm">
+            <option value="">全部时间</option><option value="today">今天</option><option value="week">7天</option><option value="month">30天</option>
+          </select>
+        </div>
+        <div id="historyList" class="history-list"></div>
+      </section>
+    </div>
+
+    <!-- ── TAB: SETTINGS PANEL ── -->
+    <section class="glass-panel tab-content-panel" id="settingsSection" style="display:none">
       <div class="card-header" onclick="toggleSettings()" style="cursor:pointer;">
         <div class="card-header-left">
           <span class="material-symbols-outlined card-icon">settings</span>
-          <span class="card-title">设置</span>
+          <span class="card-title">全局设置</span>
         </div>
         <span class="material-symbols-outlined chevron" id="settingsChevron">expand_more</span>
       </div>
-      <div id="settingsPanel" style="display:none;padding:0 24px 24px;">
+      <div id="settingsPanel" style="display:none;padding:0 0 10px;">
         <div class="form-row">
           <label>下载目录</label>
           <div style="display:flex;gap:8px;flex:1;">
             <input type="text" id="downloadDir" class="form-input" placeholder="默认 ~/Downloads/douyin" style="flex:1;">
-            <button class="btn btn--primary btn--sm" onclick="saveConfig()">保存</button>
+            <button class="btn btn--primary btn--sm" onclick="saveConfig()">保存目录</button>
           </div>
         </div>
       </div>
     </section>
+
   </main>
 
-  <!-- Mobile bottom nav -->
-  <nav class="bottom-nav">
-    <a href="#" class="bottom-nav-item active">
-      <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1">download</span>
-      <span>下载</span>
-    </a>
-    <a href="#" class="bottom-nav-item" onclick="event.preventDefault();document.getElementById('historySection').scrollIntoView({behavior:'smooth'})">
-      <span class="material-symbols-outlined">history</span>
-      <span>历史</span>
-    </a>
-    <a href="#" class="bottom-nav-item" onclick="event.preventDefault();switchSyncTab('fav');document.getElementById('syncSection').scrollIntoView({behavior:'smooth'})">
-      <span class="material-symbols-outlined">sync</span>
-      <span>同步</span>
-    </a>
-    <a href="#" class="bottom-nav-item" onclick="event.preventDefault();openSettingsSection()">
-      <span class="material-symbols-outlined">settings</span>
-      <span>设置</span>
-    </a>
-  </nav>
-
+  <!-- Load original script -->
   <script src="app.js?v=20260520"></script>
+
+  <!-- Intercept navigation layer & mutation handlers -->
+  <script>
+    // Tab switching controller
+    function switchMainPanel(panelName) {
+      // Highlight sidebar & bottom nav buttons
+      const desktopMenu = document.querySelectorAll('.menu-item');
+      const mobileItems = document.querySelectorAll('.bottom-nav-item');
+      
+      desktopMenu.forEach(item => item.classList.remove('active'));
+      mobileItems.forEach(item => item.classList.remove('active'));
+
+      const indexMap = { parser: 0, sync: 1, schedule: 2, history: 3, settings: 4 };
+      const idx = indexMap[panelName];
+      
+      if (desktopMenu[idx]) desktopMenu[idx].classList.add('active');
+      if (mobileItems[idx]) mobileItems[idx].classList.add('active');
+
+      // Hide all high-level panels
+      document.getElementById('panel-parser').style.display = 'none';
+      document.getElementById('syncSection').style.display = 'none';
+      document.getElementById('panel-history').style.display = 'none';
+      document.getElementById('settingsSection').style.display = 'none';
+
+      // Update titles
+      const titles = {
+        parser: ['链接解析器', '粘贴并解析包含抖音、小红书的分享短链或原始链接'],
+        sync: ['主页及账号同步', '同步和扫描已授权账号的收藏、喜欢列表与私信'],
+        schedule: ['定时同步规则', '配置自动化定时检测扫描，规避抖音高峰风控'],
+        history: ['下载历史库', '查询已归档的视频和高清图集物理文件'],
+        settings: ['系统配置中心', '全局存储根目录修改以及 cookie 调试选项']
+      };
+
+      if (titles[panelName]) {
+        document.getElementById('page-display-title').textContent = titles[panelName][0];
+        document.getElementById('page-display-desc').textContent = titles[panelName][1];
+      }
+
+      // Show panel & trigger programmatic active states
+      if (panelName === 'parser') {
+        document.getElementById('panel-parser').style.display = 'block';
+      } else if (panelName === 'sync') {
+        document.getElementById('syncSection').style.display = 'block';
+        if (typeof originalSwitchSyncTab === 'function') {
+          originalSwitchSyncTab('fav');
+        }
+      } else if (panelName === 'schedule') {
+        document.getElementById('syncSection').style.display = 'block';
+        if (typeof originalSwitchSyncTab === 'function') {
+          originalSwitchSyncTab('schedule');
+        }
+      } else if (panelName === 'history') {
+        document.getElementById('panel-history').style.display = 'block';
+        // Trigger empty state observer logic immediately
+        const historySection = document.getElementById('historySection');
+        const emptyState = document.getElementById('history-empty-state');
+        if (historySection && emptyState) {
+          emptyState.style.display = historySection.style.display === 'none' ? 'flex' : 'none';
+        }
+      } else if (panelName === 'settings') {
+        document.getElementById('settingsSection').style.display = 'block';
+        const panel = document.getElementById('settingsPanel');
+        const chevron = document.getElementById('settingsChevron');
+        if (panel) panel.style.display = 'block';
+        if (chevron) chevron.classList.add('open');
+      }
+    }
+
+    // Intercept switchSyncTab to sync with the main panel layout
+    let originalSwitchSyncTab = window.switchSyncTab;
+    window.switchSyncTab = function(tab) {
+      if (tab === 'schedule') {
+        // Switch main panel to schedule
+        const desktopMenu = document.querySelectorAll('.menu-item');
+        const mobileItems = document.querySelectorAll('.bottom-nav-item');
+        desktopMenu.forEach(item => item.classList.remove('active'));
+        mobileItems.forEach(item => item.classList.remove('active'));
+        if (desktopMenu[2]) desktopMenu[2].classList.add('active');
+        if (mobileItems[2]) mobileItems[2].classList.add('active');
+
+        document.getElementById('panel-parser').style.display = 'none';
+        document.getElementById('syncSection').style.display = 'block';
+        document.getElementById('panel-history').style.display = 'none';
+        document.getElementById('settingsSection').style.display = 'none';
+
+        document.getElementById('page-display-title').textContent = '定时同步规则';
+        document.getElementById('page-display-desc').textContent = '配置自动化定时检测扫描，规避抖音高峰风控';
+      } else {
+        // Switch main panel to sync
+        const desktopMenu = document.querySelectorAll('.menu-item');
+        const mobileItems = document.querySelectorAll('.bottom-nav-item');
+        desktopMenu.forEach(item => item.classList.remove('active'));
+        mobileItems.forEach(item => item.classList.remove('active'));
+        if (desktopMenu[1]) desktopMenu[1].classList.add('active');
+        if (mobileItems[1]) mobileItems[1].classList.add('active');
+
+        document.getElementById('panel-parser').style.display = 'none';
+        document.getElementById('syncSection').style.display = 'block';
+        document.getElementById('panel-history').style.display = 'none';
+        document.getElementById('settingsSection').style.display = 'none';
+
+        document.getElementById('page-display-title').textContent = '主页及账号同步';
+        document.getElementById('page-display-desc').textContent = '同步和扫描已授权账号的收藏、喜欢列表与私信';
+      }
+
+      if (typeof originalSwitchSyncTab === 'function') {
+        originalSwitchSyncTab(tab);
+      }
+    };
+
+    // Intercept openSettingsSection
+    window.openSettingsSection = function() {
+      switchMainPanel('settings');
+    };
+
+    // Auto-synchronize folder path to page header
+    const downloadDirInput = document.getElementById('downloadDir');
+    if (downloadDirInput) {
+      const updateHeaderPath = () => {
+        const val = downloadDirInput.value.trim() || '默认下载目录';
+        document.getElementById('headerPathText').textContent = val;
+      };
+      downloadDirInput.addEventListener('input', updateHeaderPath);
+      // Double check periodically
+      setInterval(updateHeaderPath, 1000);
+    }
+
+    // MutationObserver to sync login badge to sidebar status panel
+    const syncBadge = document.getElementById('syncBadge');
+    const sidebarSyncStatus = document.getElementById('sidebarSyncStatus');
+    if (syncBadge && sidebarSyncStatus) {
+      const updateSidebarStatus = () => {
+        if (syncBadge.style.display !== 'none') {
+          const text = document.getElementById('syncBadgeText').textContent || '已登录';
+          sidebarSyncStatus.innerHTML = '<span class="dot dot--active"></span>' + text;
+        } else {
+          sidebarSyncStatus.innerHTML = '<span class="dot" style="background:#ef4444; box-shadow: 0 0 8px #ef4444;"></span>未登录';
+        }
+      };
+      const obs = new MutationObserver(updateSidebarStatus);
+      obs.observe(syncBadge, { attributes: true, attributeFilter: ['style'] });
+      // Also observe label changes
+      const syncBadgeText = document.getElementById('syncBadgeText');
+      if (syncBadgeText) {
+        obs.observe(syncBadgeText, { childList: true });
+      }
+      setTimeout(updateSidebarStatus, 500);
+    }
+
+    // MutationObserver to toggle history empty state fallback automatically
+    const historySection = document.getElementById('historySection');
+    const emptyState = document.getElementById('history-empty-state');
+    if (historySection && emptyState) {
+      const observer = new MutationObserver(() => {
+        emptyState.style.display = historySection.style.display === 'none' ? 'flex' : 'none';
+      });
+      observer.observe(historySection, { attributes: true, attributeFilter: ['style'] });
+    }
+  </script>
 </body>
 </html>

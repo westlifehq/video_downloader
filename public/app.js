@@ -8,6 +8,61 @@ let appState = {
     pollTimers: {} // key: id, value: interval timer
 };
 
+// ── 辅助函数：替换 innerHTML 并在渲染前后恢复滚动位置 ──
+function setHtmlAndRestoreScroll(el, html) {
+    if (!el) return;
+
+    // 1. 记录 window 滚动位置
+    const scrollY = window.scrollY;
+    const scrollX = window.scrollX;
+
+    // 2. 记录内部所有可滚动元素的滚动偏移，通过 .fav-sync-header 前几个字符作为标识键，保证准确匹配
+    const scrollStates = [];
+    const scrollableEls = el.querySelectorAll('.fav-sync-items, [style*="overflow"], textarea, div');
+    scrollableEls.forEach(scrollEl => {
+        if (scrollEl.scrollTop > 0 || scrollEl.scrollLeft > 0) {
+            const groupEl = scrollEl.closest('.fav-group');
+            let key = '';
+            if (groupEl) {
+                const header = groupEl.querySelector('.fav-sync-header');
+                if (header) {
+                    key = header.textContent.trim().substring(0, 6);
+                }
+            }
+            scrollStates.push({
+                scrollTop: scrollEl.scrollTop,
+                scrollLeft: scrollEl.scrollLeft,
+                className: scrollEl.className,
+                key: key
+            });
+        }
+    });
+
+    // 3. 赋值 HTML
+    el.innerHTML = html;
+
+    // 4. 恢复内部可滚动元素的滚动偏移
+    const newScrollableEls = el.querySelectorAll('.fav-sync-items, [style*="overflow"], textarea, div');
+    newScrollableEls.forEach(newScrollEl => {
+        const groupEl = newScrollEl.closest('.fav-group');
+        let key = '';
+        if (groupEl) {
+            const header = groupEl.querySelector('.fav-sync-header');
+            if (header) {
+                key = header.textContent.trim().substring(0, 6);
+            }
+        }
+        const state = scrollStates.find(s => s.className === newScrollEl.className && s.key === key);
+        if (state) {
+            newScrollEl.scrollTop = state.scrollTop;
+            newScrollEl.scrollLeft = state.scrollLeft;
+        }
+    });
+
+    // 5. 恢复 window 滚动位置
+    window.scrollTo(scrollX, scrollY);
+}
+
 // ── 初始化 ──
 document.addEventListener('DOMContentLoaded', () => {
     loadConfig();
@@ -169,22 +224,22 @@ function updateCard(id) {
     if (!el) return;
 
     if (item.loading) {
-        el.innerHTML = `
+        setHtmlAndRestoreScroll(el, `
             <div class="video-card" style="justify-content:center; padding:30px;">
                 <div class="btn-loader" style="display:block; border-top-color:var(--c-primary); width:24px; height:24px;"></div>
                 <div style="margin-left:12px; color:var(--c-text-muted); font-size:14px;">解析中...</div>
-            </div>`;
+            </div>`);
         return;
     }
 
     if (item.error) {
-        el.innerHTML = `
+        setHtmlAndRestoreScroll(el, `
             <div class="video-card" style="border-color: rgba(248, 113, 113, 0.4);">
                 <div class="video-meta">
                     <p style="color:var(--c-error); font-weight:500;">解析失败: ${item.error}</p>
                     <p style="font-size:12px; color:var(--c-text-muted); margin-top:8px; word-break:break-all;">${item.url}</p>
                 </div>
-            </div>`;
+            </div>`);
         return;
     }
 
@@ -206,36 +261,44 @@ function updateCard(id) {
         }
 
         if (item.syncStatus === 'idle') {
-            el.innerHTML = `
+            if (item.syncType === undefined) {
+                item.syncType = 'post';
+            }
+            setHtmlAndRestoreScroll(el, `
               <div class="video-card user-sync-card" style="flex-direction:column; align-items:stretch;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                   <div style="display:flex; align-items:center; gap:8px;">
                     <div class="author-avatar" style="width:36px; height:36px; border-radius:50%; background:var(--c-primary); display:flex; align-items:center; justify-content:center; font-weight:bold; color:white; font-size:18px;">👤</div>
                     <div>
                       <h3 style="font-size:15px; font-weight:600; color:white; margin:0;">${item.nickname || info.author?.nickname || '抖音用户'}</h3>
-                      <p style="font-size:12px; color:var(--c-text-muted); margin:0;">检测到这是一个抖音用户主页，可以同步并批量下载作品。</p>
+                      <p style="font-size:12px; color:var(--c-text-muted); margin:0;">检测到这是一个抖音用户主页，可以同步并批量下载其作品或公开喜欢视频。</p>
                     </div>
                   </div>
                 </div>
-                <div style="display:flex; align-items:center; gap:8px;">
-                  <select id="user-sync-count-${id}" class="select-field" style="width:120px; display:inline-block; height:36px; padding:0 8px; border-radius:6px; background:rgba(255,255,255,0.05); color:white; border:1px solid rgba(255,255,255,0.1);" onchange="appState.items['${id}'].syncMaxCount = parseInt(this.value)">
+                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                  <select id="user-sync-type-${id}" class="select-field" style="width:110px; display:inline-block; height:36px; padding:0 8px; border-radius:6px; background:rgba(255,255,255,0.05); color:white; border:1px solid rgba(255,255,255,0.1);" onchange="appState.items['${id}'].syncType = this.value">
+                    <option value="post" ${item.syncType === 'post' ? 'selected' : ''}>个人作品</option>
+                    <option value="like" ${item.syncType === 'like' ? 'selected' : ''}>公开喜欢</option>
+                    <option value="favorite" ${item.syncType === 'favorite' ? 'selected' : ''}>公开收藏</option>
+                  </select>
+                  <select id="user-sync-count-${id}" class="select-field" style="width:110px; display:inline-block; height:36px; padding:0 8px; border-radius:6px; background:rgba(255,255,255,0.05); color:white; border:1px solid rgba(255,255,255,0.1);" onchange="appState.items['${id}'].syncMaxCount = parseInt(this.value)">
                     <option value="50" ${item.syncMaxCount === 50 ? 'selected' : ''}>最新 50 条</option>
                     <option value="100" ${item.syncMaxCount === 100 ? 'selected' : ''}>最新 100 条</option>
                     <option value="200" ${item.syncMaxCount === 200 ? 'selected' : ''}>最新 200 条</option>
                     <option value="500" ${item.syncMaxCount === 500 ? 'selected' : ''}>最新 500 条</option>
                   </select>
-                  <button class="btn btn--sync" style="flex:1; height:36px; border-radius:6px;" onclick="handleUserSync('${id}', '${info.secUid}')">提取作品列表</button>
+                  <button class="btn btn--sync" style="flex:1; height:36px; border-radius:6px;" onclick="handleUserSync('${id}', '${info.secUid}')">提取列表</button>
                 </div>
               </div>
-            `;
+            `);
             return;
         }
 
         if (item.syncStatus === 'fetching') {
-            el.innerHTML = `
+            setHtmlAndRestoreScroll(el, `
               <div class="video-card user-sync-card" style="flex-direction:column; align-items:stretch;">
                 <div class="fav-sync-header" style="margin-bottom:8px">
-                  <span class="fav-sync-phase" style="font-size:13px; font-weight:600;">${item.syncPhase || '正在同步作品列表...'}</span>
+                  <span class="fav-sync-phase" style="font-size:13px; font-weight:600;">${item.syncPhase || '正在同步...'}</span>
                   <span class="fav-sync-counter" style="margin-left:8px; font-size:12px; color:var(--c-text-muted);">已发现 ${item.syncCollected || 0} 条</span>
                   <button class="btn btn--stop" style="padding:4px 10px; font-size:11px; border-radius:6px; color:white; border:none; cursor:pointer;" onclick="stopUserSync('${id}')">停止打断</button>
                 </div>
@@ -243,21 +306,21 @@ function updateCard(id) {
                   <div class="fav-sync-progress-fill indeterminate" style="width:30%"></div>
                 </div>
               </div>
-            `;
+            `);
             return;
         }
 
         if (item.syncStatus === 'error') {
-            el.innerHTML = `
+            setHtmlAndRestoreScroll(el, `
               <div class="video-card user-sync-card" style="flex-direction:column; align-items:stretch; border-color: rgba(248, 113, 113, 0.4);">
-                <h3 style="font-size:14px; font-weight:600; color:var(--c-error); margin:0 0 8px 0;">获取作品失败</h3>
+                <h3 style="font-size:14px; font-weight:600; color:var(--c-error); margin:0 0 8px 0;">获取失败</h3>
                 <p style="font-size:12px; color:var(--c-text-muted); margin:0 0 12px 0;">${item.error || '出错了，请检查本地网络或登录状态'}</p>
                 <div style="display:flex; gap:8px;">
                   <button class="btn btn--secondary" style="flex:1; height:32px; border-radius:6px; font-size:12px;" onclick="resetUserSync('${id}')">返回重新设置</button>
                   <button class="btn btn--sync" style="flex:1; height:32px; border-radius:6px; font-size:12px;" onclick="handleUserSync('${id}', '${info.secUid}')">重试同步</button>
                 </div>
               </div>
-            `;
+            `);
             return;
         }
 
@@ -288,7 +351,7 @@ function updateCard(id) {
                     <div class="author-avatar" style="width:32px; height:32px; border-radius:50%; background:var(--c-primary); display:flex; align-items:center; justify-content:center; font-weight:bold; color:white; font-size:16px; flex-shrink:0;">👤</div>
                     <div style="min-width:0;">
                       <h3 style="font-size:14px; font-weight:600; color:white; margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${item.nickname || info.author?.nickname}">${item.nickname || info.author?.nickname || '抖音用户'}</h3>
-                      <p style="font-size:11px; color:var(--c-text-muted); margin:0;">主页作品同步 (发现 ${item.userItems.length} 条)</p>
+                      <p style="font-size:11px; color:var(--c-text-muted); margin:0;">主页${item.syncType === 'like' ? '喜欢' : (item.syncType === 'favorite' ? '收藏' : '作品')}同步 (发现 ${item.userItems.length} 条)</p>
                     </div>
                   </div>
                   <button class="btn btn--secondary" style="padding:4px 8px; font-size:11px; border-radius:6px; height:24px; flex-shrink:0;" onclick="resetUserSync('${id}')">重设</button>
@@ -379,7 +442,7 @@ function updateCard(id) {
                 bodyHtml += '</div>';
             }
 
-            el.innerHTML = headerHtml + bodyHtml + '</div>';
+            setHtmlAndRestoreScroll(el, headerHtml + bodyHtml + '</div>');
             return;
         }
     }
@@ -437,7 +500,7 @@ function updateCard(id) {
         `;
     }
 
-    el.innerHTML = `
+    setHtmlAndRestoreScroll(el, `
       <div class="video-card">
         <div class="video-cover-wrap">
           <img class="video-cover" src="${info.cover || ''}" alt="封面">
@@ -463,7 +526,7 @@ function updateCard(id) {
         </div>
       </div>
       ${progressHtml}
-    `;
+    `);
 }
 
 // ── 下载与轮询处理 ──
@@ -982,7 +1045,7 @@ let favDownloadedExpanded = false;
 function renderFavList() {
     const panel = document.getElementById('favSyncPanel');
     if (!favSyncedItems || favSyncedItems.length === 0) {
-        panel.innerHTML = '<div class="fav-login-hint">收藏列表为空</div>';
+        setHtmlAndRestoreScroll(panel, '<div class="fav-login-hint">收藏列表为空</div>');
         return;
     }
 
@@ -1075,7 +1138,7 @@ function renderFavList() {
         html += '</div>';
     }
 
-    panel.innerHTML = html;
+    setHtmlAndRestoreScroll(panel, html);
 }
 
 function renderFavItemCard(item, isDownloadedSection) {
@@ -1446,7 +1509,7 @@ function pollLikedSync(taskId) {
 function renderLikedList() {
     const panel = document.getElementById('likedSyncPanel');
     if (!likedSyncedItems || likedSyncedItems.length === 0) {
-        panel.innerHTML = '<div class="fav-login-hint">喜欢列表为空</div>';
+        setHtmlAndRestoreScroll(panel, '<div class="fav-login-hint">喜欢列表为空</div>');
         return;
     }
 
@@ -1536,7 +1599,7 @@ function renderLikedList() {
         html += '</div>';
     }
 
-    panel.innerHTML = html;
+    setHtmlAndRestoreScroll(panel, html);
 }
 
 function renderLikedItemCard(item, isDownloadedSection) {
@@ -1899,7 +1962,7 @@ function pollMsgSync(taskId) {
 function renderMsgList() {
     const panel = document.getElementById('msgSyncPanel');
     if (!msgSyncedItems || msgSyncedItems.length === 0) {
-        panel.innerHTML = '<div class="fav-login-hint">未在私信中发现视频链接</div>';
+        setHtmlAndRestoreScroll(panel, '<div class="fav-login-hint">未在私信中发现视频链接</div>');
         return;
     }
 
@@ -1989,7 +2052,7 @@ function renderMsgList() {
         html += '</div>';
     }
 
-    panel.innerHTML = html;
+    setHtmlAndRestoreScroll(panel, html);
 }
 
 function renderMsgItemCard(item, isDownloadedSection) {
@@ -2440,13 +2503,21 @@ async function handleUserSync(cardId, secUid) {
     const item = appState.items[cardId];
     if (!item) return;
 
+    if (item.syncType === undefined) {
+        item.syncType = 'post';
+    }
+
     item.syncStatus = 'fetching';
     item.syncPhase = '正在发起同步请求...';
     item.syncCollected = 0;
     updateCard(cardId);
 
     try {
-        const result = await api('POST', '/api/user/sync', { secUid, maxCount: item.syncMaxCount });
+        const result = await api('POST', '/api/user/sync', { 
+            secUid, 
+            maxCount: item.syncMaxCount,
+            tabType: item.syncType
+        });
         if (!result.taskId) throw new Error('同步请求失败，未返回任务 ID');
         item.syncTaskId = result.taskId;
         pollUserSync(cardId, result.taskId);
@@ -2454,7 +2525,7 @@ async function handleUserSync(cardId, secUid) {
         item.syncStatus = 'error';
         item.error = err.message;
         updateCard(cardId);
-        showToast('提取作品失败: ' + err.message, 'error');
+        showToast('提取列表失败: ' + err.message, 'error');
     }
 }
 
@@ -2467,19 +2538,22 @@ function pollUserSync(cardId, taskId) {
     appState.pollTimers[cardId] = setInterval(async () => {
         try {
             const task = await api('GET', `/api/user/sync/${taskId}`);
-            item.syncPhase = task.phase || '正在同步作品列表...';
+            item.syncPhase = task.phase || '正在同步列表...';
             item.syncCollected = task.collected || 0;
             if (task.nickname) item.nickname = task.nickname;
+            if (task.tabType) item.syncType = task.tabType;
 
             if (task.status === 'done' || task.status === 'error') {
                 clearInterval(appState.pollTimers[cardId]);
                 delete appState.pollTimers[cardId];
 
+                const label = item.syncType === 'like' ? '喜欢' : (item.syncType === 'favorite' ? '收藏' : '作品');
+
                 if (task.status === 'error') {
                     item.syncStatus = 'error';
-                    item.error = task.error || '获取作品列表失败';
+                    item.error = task.error || `获取${label}列表失败`;
                     updateCard(cardId);
-                    showToast('获取作品列表失败', 'error');
+                    showToast(`获取${label}列表失败`, 'error');
                 } else {
                     item.syncStatus = 'done';
                     item.userItems = task.items || [];
@@ -2487,7 +2561,7 @@ function pollUserSync(cardId, taskId) {
                     item.selectedItems.clear();
                     updateCard(cardId);
                     const newCount = item.userItems.filter(i => !i.alreadyDownloaded && !i.parseError).length;
-                    showToast(`已获取 ${task.items.length} 条作品，${newCount} 条未下载`, 'success');
+                    showToast(`已获取 ${task.items.length} 条${label}，${newCount} 条未下载`, 'success');
                 }
             } else {
                 updateCard(cardId);
@@ -2726,6 +2800,7 @@ async function downloadSelectedUserItems(cardId) {
     let subDir = '';
     if (toDownload.length > 1) {
         const nickname = item.nickname || (item.info && item.info.author && item.info.author.nickname) || '抖音用户';
+        const typeSuffix = item.syncType === 'like' ? '_喜欢' : (item.syncType === 'favorite' ? '_收藏' : '');
         const now = new Date();
         const yyyy = now.getFullYear();
         const mm = String(now.getMonth() + 1).padStart(2, '0');
@@ -2733,7 +2808,7 @@ async function downloadSelectedUserItems(cardId) {
         const hh = String(now.getHours()).padStart(2, '0');
         const min = String(now.getMinutes()).padStart(2, '0');
         const ss = String(now.getSeconds()).padStart(2, '0');
-        subDir = `${nickname}_${yyyy}${mm}${dd}_${hh}${min}${ss}`;
+        subDir = `${nickname}${typeSuffix}_${yyyy}${mm}${dd}_${hh}${min}${ss}`;
     }
     
     for (const idx of toDownload) {
@@ -2758,6 +2833,7 @@ async function downloadAllUserItems(cardId) {
     let subDir = '';
     if (toDownload.length > 1) {
         const nickname = item.nickname || (item.info && item.info.author && item.info.author.nickname) || '抖音用户';
+        const typeSuffix = item.syncType === 'like' ? '_喜欢' : (item.syncType === 'favorite' ? '_收藏' : '');
         const now = new Date();
         const yyyy = now.getFullYear();
         const mm = String(now.getMonth() + 1).padStart(2, '0');
@@ -2765,7 +2841,7 @@ async function downloadAllUserItems(cardId) {
         const hh = String(now.getHours()).padStart(2, '0');
         const min = String(now.getMinutes()).padStart(2, '0');
         const ss = String(now.getSeconds()).padStart(2, '0');
-        subDir = `${nickname}_${yyyy}${mm}${dd}_${hh}${min}${ss}`;
+        subDir = `${nickname}${typeSuffix}_${yyyy}${mm}${dd}_${hh}${min}${ss}`;
     }
 
     for (const idx of toDownload) {
