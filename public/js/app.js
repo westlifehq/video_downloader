@@ -1511,7 +1511,7 @@ function pollUserSync(cardId, taskId) {
                 clearInterval(appState.pollTimers[cardId]);
                 delete appState.pollTimers[cardId];
 
-                const label = item.syncType === 'like' ? '喜欢' : (item.syncType === 'favorite' ? '收藏' : '作品');
+                const label = item.syncType === 'like' ? '喜欢' : '作品';
 
                 if (task.status === 'error') {
                     item.syncStatus = 'error';
@@ -1775,7 +1775,7 @@ async function downloadSelectedUserItems(cardId) {
     let subDir = '';
     if (toDownload.length > 1) {
         const nickname = item.nickname || (item.info && item.info.author && item.info.author.nickname) || '抖音用户';
-        const typeSuffix = item.syncType === 'like' ? '_喜欢' : (item.syncType === 'favorite' ? '_收藏' : '');
+        const typeSuffix = item.syncType === 'like' ? '_喜欢' : '';
         const now = new Date();
         const yyyy = now.getFullYear();
         const mm = String(now.getMonth() + 1).padStart(2, '0');
@@ -1807,7 +1807,7 @@ async function downloadAllUserItems(cardId) {
     let subDir = '';
     if (toDownload.length > 1) {
         const nickname = item.nickname || (item.info && item.info.author && item.info.author.nickname) || '抖音用户';
-        const typeSuffix = item.syncType === 'like' ? '_喜欢' : (item.syncType === 'favorite' ? '_收藏' : '');
+        const typeSuffix = item.syncType === 'like' ? '_喜欢' : '';
         const now = new Date();
         const yyyy = now.getFullYear();
         const mm = String(now.getMonth() + 1).padStart(2, '0');

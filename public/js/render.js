@@ -92,7 +92,6 @@ function updateCard(id) {
                   <select id="user-sync-type-${id}" class="select-field" style="width:110px; display:inline-block; height:36px; padding:0 8px; border-radius:6px; background:rgba(255,255,255,0.05); color:white; border:1px solid rgba(255,255,255,0.1);" onchange="appState.items['${id}'].syncType = this.value">
                     <option value="post" ${item.syncType === 'post' ? 'selected' : ''}>个人作品</option>
                     <option value="like" ${item.syncType === 'like' ? 'selected' : ''}>公开喜欢</option>
-                    <option value="favorite" ${item.syncType === 'favorite' ? 'selected' : ''}>公开收藏</option>
                   </select>
                   <select id="user-sync-count-${id}" class="select-field" style="width:110px; display:inline-block; height:36px; padding:0 8px; border-radius:6px; background:rgba(255,255,255,0.05); color:white; border:1px solid rgba(255,255,255,0.1);" onchange="appState.items['${id}'].syncMaxCount = parseInt(this.value)">
                     <option value="50" ${item.syncMaxCount === 50 ? 'selected' : ''}>最新 50 条</option>
@@ -164,7 +163,7 @@ function updateCard(id) {
                     <div class="author-avatar" style="width:32px; height:32px; border-radius:50%; background:var(--c-primary); display:flex; align-items:center; justify-content:center; font-weight:bold; color:white; font-size:16px; flex-shrink:0;">👤</div>
                     <div style="min-width:0;">
                       <h3 style="font-size:14px; font-weight:600; color:white; margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHTML(item.nickname || info.author?.nickname)}">${escapeHTML(item.nickname || info.author?.nickname || '抖音用户')}</h3>
-                      <p style="font-size:11px; color:var(--c-text-muted); margin:0;">主页${item.syncType === 'like' ? '喜欢' : (item.syncType === 'favorite' ? '收藏' : '作品')}同步 (发现 ${item.userItems.length} 条)</p>
+                      <p style="font-size:11px; color:var(--c-text-muted); margin:0;">主页${item.syncType === 'like' ? '喜欢' : '作品'}同步 (发现 ${item.userItems.length} 条)</p>
                     </div>
                   </div>
                   <button class="btn btn--secondary" style="padding:4px 8px; font-size:11px; border-radius:6px; height:24px; flex-shrink:0;" onclick="resetUserSync('${id}')">重设</button>

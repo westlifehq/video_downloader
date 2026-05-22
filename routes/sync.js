@@ -466,7 +466,13 @@ router.post('/user/sync', async (req, res) => {
     const { secUid } = req.body;
     const maxCount = req.body.maxCount || 50;
     const tabType = req.body.tabType || 'post';
-    const tabLabel = tabType === 'like' ? '喜欢视频' : (tabType === 'favorite' ? '收藏视频' : '作品');
+
+    // 仅支持 post 和 like（抖音 web 端不支持查看他人收藏/收藏夹）
+    if (tabType !== 'post' && tabType !== 'like') {
+        return res.status(400).json({ error: '不支持的同步类型，抖音网页版仅支持同步作品和公开喜欢' });
+    }
+
+    const tabLabel = tabType === 'like' ? '喜欢视频' : '作品';
 
     if (!secUid) return res.status(400).json({ error: '请提供 secUid' });
     // secUid 格式校验：应为字母数字下划线横线点组成
@@ -498,16 +504,22 @@ router.post('/user/sync', async (req, res) => {
 
     (async () => {
         try {
-            const result = await favorites.fetchUserPosts(secUid, maxCount, async (collected, max, current) => {
+            const progressCb = async (collected, max, current) => {
                 const updates = { collected, maxCount: max };
                 if (current && current.nickname) {
                     updates.nickname = current.nickname;
                 }
+                if (current && current.title) {
+                    updates.phase = current.title;
+                }
                 await taskManager.updateTask('userSync', taskId, updates);
-            }, () => {
+            };
+            const interruptCb = () => {
                 const t = taskManager.getTask('userSync', taskId);
                 return t ? t.interrupted : false;
-            }, tabType);
+            };
+
+            const result = await favorites.fetchUserPosts(secUid, maxCount, progressCb, interruptCb, tabType);
 
             const currentTask = taskManager.getTask('userSync', taskId);
             const rawItems = result.items;
@@ -522,8 +534,6 @@ router.post('/user/sync', async (req, res) => {
                 return;
             }
 
-            const syncedData = await favorites.getSyncedData();
-            const syncedIds = new Set(syncedData.ids || []);
             const downloadDir = await configHelper.getEffectiveDownloadDir();
             const items = [];
 
@@ -537,7 +547,20 @@ router.post('/user/sync', async (req, res) => {
                         ? `[图集]_${safeName}`
                         : `${safeName}_${awemeId || Date.now()}.mp4`;
                     const savePath = path.join(downloadDir, fileName);
-                    const alreadyDownloaded = syncedIds.has(awemeId) || fsSync.existsSync(savePath);
+                    
+                    // 判断是否已下载：只检查当前用户历史批量下载目录
+                    // 根目录里的文件可能来自其他用户的单独下载，不应污染当前用户结果
+                    let alreadyDownloaded = false;
+                    try {
+                        const dirs = fsSync.readdirSync(downloadDir, { withFileTypes: true });
+                        for (const d of dirs) {
+                            if (!d.isDirectory() || !d.name.startsWith(nickname)) continue;
+                            if (fsSync.existsSync(path.join(downloadDir, d.name, fileName))) {
+                                alreadyDownloaded = true;
+                                break;
+                            }
+                        }
+                    } catch (e) {}
 
                     items.push({
                         type: info.type,

@@ -7,7 +7,16 @@ const PORT = process.env.PORT || 3000;
 
 // 中间件
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), {
+  etag: false,
+  maxAge: 0,
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.js') || filePath.endsWith('.css') || filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+    }
+  }
+}));
 
 // 全局异常捕获，防止黑窗口闪退
 function pressAnyKeyToExit() {
