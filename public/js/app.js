@@ -1511,7 +1511,7 @@ function pollUserSync(cardId, taskId) {
                 clearInterval(appState.pollTimers[cardId]);
                 delete appState.pollTimers[cardId];
 
-                const label = item.syncType === 'like' ? '喜欢' : (item.syncType === 'favorite' ? '收藏' : '作品');
+                const label = item.syncType === 'like' ? '喜欢' : (item.syncType === 'favorite' ? '收藏' : (item.syncType === 'collection' ? '收藏夹' : '作品'));
 
                 if (task.status === 'error') {
                     item.syncStatus = 'error';

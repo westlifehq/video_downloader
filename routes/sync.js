@@ -466,7 +466,7 @@ router.post('/user/sync', async (req, res) => {
     const { secUid } = req.body;
     const maxCount = req.body.maxCount || 50;
     const tabType = req.body.tabType || 'post';
-    const tabLabel = tabType === 'like' ? '喜欢视频' : (tabType === 'favorite' ? '收藏视频' : '作品');
+    const tabLabel = tabType === 'like' ? '喜欢视频' : (tabType === 'favorite' ? '收藏视频' : (tabType === 'collection' ? '收藏夹' : '作品'));
 
     if (!secUid) return res.status(400).json({ error: '请提供 secUid' });
     // secUid 格式校验：应为字母数字下划线横线点组成
@@ -498,16 +498,27 @@ router.post('/user/sync', async (req, res) => {
 
     (async () => {
         try {
-            const result = await favorites.fetchUserPosts(secUid, maxCount, async (collected, max, current) => {
+            const progressCb = async (collected, max, current) => {
                 const updates = { collected, maxCount: max };
                 if (current && current.nickname) {
                     updates.nickname = current.nickname;
                 }
+                if (current && current.title) {
+                    updates.phase = current.title;
+                }
                 await taskManager.updateTask('userSync', taskId, updates);
-            }, () => {
+            };
+            const interruptCb = () => {
                 const t = taskManager.getTask('userSync', taskId);
                 return t ? t.interrupted : false;
-            }, tabType);
+            };
+
+            let result;
+            if (tabType === 'collection') {
+                result = await favorites.fetchUserCollections(secUid, maxCount, progressCb, interruptCb);
+            } else {
+                result = await favorites.fetchUserPosts(secUid, maxCount, progressCb, interruptCb, tabType);
+            }
 
             const currentTask = taskManager.getTask('userSync', taskId);
             const rawItems = result.items;
