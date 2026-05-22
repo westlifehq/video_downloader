@@ -92,8 +92,6 @@ function updateCard(id) {
                   <select id="user-sync-type-${id}" class="select-field" style="width:110px; display:inline-block; height:36px; padding:0 8px; border-radius:6px; background:rgba(255,255,255,0.05); color:white; border:1px solid rgba(255,255,255,0.1);" onchange="appState.items['${id}'].syncType = this.value">
                     <option value="post" ${item.syncType === 'post' ? 'selected' : ''}>个人作品</option>
                     <option value="like" ${item.syncType === 'like' ? 'selected' : ''}>公开喜欢</option>
-                    <option value="favorite" ${item.syncType === 'favorite' ? 'selected' : ''}>公开收藏</option>
-                    <option value="collection" ${item.syncType === 'collection' ? 'selected' : ''}>收藏夹</option>
                   </select>
                   <select id="user-sync-count-${id}" class="select-field" style="width:110px; display:inline-block; height:36px; padding:0 8px; border-radius:6px; background:rgba(255,255,255,0.05); color:white; border:1px solid rgba(255,255,255,0.1);" onchange="appState.items['${id}'].syncMaxCount = parseInt(this.value)">
                     <option value="50" ${item.syncMaxCount === 50 ? 'selected' : ''}>最新 50 条</option>

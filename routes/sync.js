@@ -466,7 +466,13 @@ router.post('/user/sync', async (req, res) => {
     const { secUid } = req.body;
     const maxCount = req.body.maxCount || 50;
     const tabType = req.body.tabType || 'post';
-    const tabLabel = tabType === 'like' ? '喜欢视频' : (tabType === 'favorite' ? '收藏视频' : (tabType === 'collection' ? '收藏夹' : '作品'));
+
+    // 仅支持 post 和 like（抖音 web 端不支持查看他人收藏/收藏夹）
+    if (tabType !== 'post' && tabType !== 'like') {
+        return res.status(400).json({ error: '不支持的同步类型，抖音网页版仅支持同步作品和公开喜欢' });
+    }
+
+    const tabLabel = tabType === 'like' ? '喜欢视频' : '作品';
 
     if (!secUid) return res.status(400).json({ error: '请提供 secUid' });
     // secUid 格式校验：应为字母数字下划线横线点组成
@@ -513,12 +519,7 @@ router.post('/user/sync', async (req, res) => {
                 return t ? t.interrupted : false;
             };
 
-            let result;
-            if (tabType === 'collection') {
-                result = await favorites.fetchUserCollections(secUid, maxCount, progressCb, interruptCb);
-            } else {
-                result = await favorites.fetchUserPosts(secUid, maxCount, progressCb, interruptCb, tabType);
-            }
+            const result = await favorites.fetchUserPosts(secUid, maxCount, progressCb, interruptCb, tabType);
 
             const currentTask = taskManager.getTask('userSync', taskId);
             const rawItems = result.items;
