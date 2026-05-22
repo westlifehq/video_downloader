@@ -2,6 +2,13 @@
 
 本文件记录项目的主要变更。
 
+## [v8.2.1] - 2025-07-18
+
+### Fixed (用户同步缓存与误判修复)
+- **修复不同用户链接返回相同结果**：通过 CDP 协议（`Network.clearBrowserCache` + `Network.setCacheDisabled`）在每次同步启动时彻底清除浏览器 HTTP 缓存，解决持久化浏览器上下文在不同用户同步间泄露缓存 API 响应的问题。
+- **修复"已下载"误判**：用户主页同步不再依赖全局 `synced_ids.json`/`liked_ids.json` ID 池判断是否已下载，仅以实际文件存在为准，避免跨用户、跨同步模式的误标。
+- **修复收藏 API 误匹配喜欢列表**：`tabType='favorite'` 的 URL 匹配规则移除过于宽泛的 `url.includes('favorite')`（会命中喜欢列表 API），改为精确匹配 `collect` 相关路径。
+
 ## [v8.2.0] - 2025-07-17
 
 ### Added (收藏夹同步新功能)
