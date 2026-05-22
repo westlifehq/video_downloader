@@ -524,6 +524,8 @@ router.post('/user/sync', async (req, res) => {
 
             const syncedData = await favorites.getSyncedData();
             const syncedIds = new Set(syncedData.ids || []);
+            const likedData = await favorites.getLikedData();
+            const likedIds = new Set(likedData.ids || []);
             const downloadDir = await configHelper.getEffectiveDownloadDir();
             const items = [];
 
@@ -537,7 +539,10 @@ router.post('/user/sync', async (req, res) => {
                         ? `[图集]_${safeName}`
                         : `${safeName}_${awemeId || Date.now()}.mp4`;
                     const savePath = path.join(downloadDir, fileName);
-                    const alreadyDownloaded = syncedIds.has(awemeId) || fsSync.existsSync(savePath);
+                    // 根据 tabType 对应正确的 ID 池，避免跨池误判
+                    const fileExists = fsSync.existsSync(savePath);
+                    const inCorrectPool = tabType === 'like' ? likedIds.has(awemeId) : syncedIds.has(awemeId);
+                    const alreadyDownloaded = fileExists || inCorrectPool;
 
                     items.push({
                         type: info.type,
