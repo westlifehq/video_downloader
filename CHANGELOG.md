@@ -2,6 +2,22 @@
 
 本文件记录项目的主要变更。
 
+## [v8.2.1] - 2026-05-25 23:25 +08:00
+
+### Fixed
+- **修复 Docker 定时同步被浏览器锁误拦截**：`lib/douyin-favorites.js` 中 `fetchMessageVideos()` 的 `finally` 现在会显式执行 `activeBrowser = null`，避免上一轮私信同步结束后未释放全局浏览器锁，导致下一轮随机定时任务直接报“已有一个浏览器窗口在运行，请先完成当前操作”。
+
+### Metadata
+- Branch: `main`
+- Commit base: `e0719e3`
+- Scope: `lib/douyin-favorites.js`
+
+### Verified
+- 通过容器日志与 `schedule_log.json` 定位到 2026-05-24 04:45 的失败原因为浏览器锁未释放。
+- Docker 已按增量覆盖方式更新，容器内 `/app/lib/douyin-favorites.js` 已确认包含新增的 `activeBrowser = null;`。
+- Docker 服务 `http://127.0.0.1:3000` 返回 `200`。
+
+
 ## [v8.2.0] - 2026-05-22 11:20 +08:00
 
 ### Fixed
