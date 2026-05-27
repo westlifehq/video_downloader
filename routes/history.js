@@ -18,6 +18,10 @@ router.get('/history', (req, res) => {
  * POST /api/history/open — 打开本地文件
  */
 router.post('/history/open', async (req, res) => {
+    if (req.app.locals.remoteManagementDisabled) {
+        return res.status(403).json({ error: '当前部署模式已禁用远程文件管理能力' });
+    }
+
     const { filePath } = req.body;
     if (!filePath) {
         return res.status(400).json({ error: '未提供文件路径' });
@@ -36,6 +40,10 @@ router.post('/history/open', async (req, res) => {
  * POST /api/history/delete — 删除本地文件
  */
 router.post('/history/delete', async (req, res) => {
+    if (req.app.locals.remoteManagementDisabled) {
+        return res.status(403).json({ error: '当前部署模式已禁用远程删除能力' });
+    }
+
     const { filePath } = req.body;
     if (!filePath) {
         return res.status(400).json({ error: '未提供文件路径' });

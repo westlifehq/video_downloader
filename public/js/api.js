@@ -3,18 +3,40 @@
    ═══════════════════════════════════════════ */
 
 // ── API 封装 ──
+function getApiToken() {
+    return window.localStorage.getItem('api_token') || '';
+}
+
+function setApiToken(token) {
+    const value = (token || '').trim();
+    if (value) {
+        window.localStorage.setItem('api_token', value);
+    } else {
+        window.localStorage.removeItem('api_token');
+    }
+}
+
 async function api(method, url, body) {
+    const headers = { 'Content-Type': 'application/json' };
+    const token = getApiToken();
+    if (token) {
+        headers.Authorization = `Bearer ${token}`;
+    }
+
     const options = {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers,
     };
     if (body) options.body = JSON.stringify(body);
 
     const resp = await fetch(url, options);
-    const data = await resp.json();
+    const contentType = resp.headers.get('content-type') || '';
+    const isJson = contentType.includes('application/json');
+    const data = isJson ? await resp.json() : null;
+    const text = isJson ? '' : await resp.text();
 
     if (!resp.ok) {
-        throw new Error(data.error || `请求失败 (${resp.status})`);
+        throw new Error((data && data.error) || text || `请求失败 (${resp.status})`);
     }
     return data;
 }

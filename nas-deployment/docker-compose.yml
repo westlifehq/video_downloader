@@ -18,3 +18,11 @@ services:
     environment:
       - NODE_ENV=production
       - DOWNLOAD_DIR=/downloads
+      - API_TOKEN=change-me-to-a-long-random-string
+      - DISABLE_REMOTE_FILE_ACTIONS=true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp

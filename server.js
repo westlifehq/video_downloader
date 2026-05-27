@@ -4,9 +4,25 @@ const schedulerService = require('./lib/scheduler-service');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const API_TOKEN = (process.env.API_TOKEN || '').trim();
+const REMOTE_MANAGEMENT_DISABLED = process.env.DISABLE_REMOTE_FILE_ACTIONS === 'true';
 
 // 中间件
 app.use(express.json());
+
+app.use((req, res, next) => {
+  if (!API_TOKEN) {
+    return next();
+  }
+
+  const authHeader = req.headers.authorization || '';
+  if (authHeader === `Bearer ${API_TOKEN}`) {
+    return next();
+  }
+
+  res.status(401).json({ error: '未授权访问' });
+});
+
 app.use(express.static(path.join(__dirname, 'public'), {
   etag: false,
   maxAge: 0,
@@ -61,8 +77,17 @@ app.use('/api', syncRouter);
 const isDocker = require('fs').existsSync('/.dockerenv') || process.env.IS_DOCKER === 'true';
 const HOST = process.env.HOST || (isDocker ? '0.0.0.0' : '127.0.0.1');
 
+app.locals.remoteManagementDisabled = REMOTE_MANAGEMENT_DISABLED;
+
 app.listen(PORT, HOST, () => {
     console.log(`\n🎬 抖音视频下载器已启动`);
-    console.log(`📍 http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}\n`);
+    console.log(`📍 http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`);
+    if (API_TOKEN) {
+        console.log('🔐 API Token 鉴权已启用');
+    }
+    if (REMOTE_MANAGEMENT_DISABLED) {
+        console.log('🛡️ 远程文件管理接口已禁用');
+    }
+    console.log('');
     schedulerService.startScheduledTask();
 });

@@ -2,6 +2,41 @@
 
 本文件记录项目的主要变更。
 
+## [v8.3.0] - 2026-05-27 19:30 +08:00
+
+### Security
+- **API Token 鉴权**：新增 `API_TOKEN` 环境变量，启用后所有 `/api/*` 请求须携带 `Authorization: Bearer <token>`，解决 NAS/Docker 部署匿名可访问的问题。
+- **下载 URL 白名单**：`lib/douyin.js` 新增 `TRUSTED_DOWNLOAD_HOSTS` + `getSafeDownloadUrl()`，限制下载协议仅 `http/https`、主机仅信任平台域名，防止后端变成任意 URL 下载代理（SSRF）。
+- **远程文件管理禁用**：新增 `DISABLE_REMOTE_FILE_ACTIONS` 环境变量，启用后 `/api/history/open` 和 `/api/history/delete` 返回 `403`，缩小 NAS 远程攻击面。
+- **Docker 容器硬化**：Dockerfile 改为 `USER pwuser` 非 root 运行；docker-compose 新增 `cap_drop: ALL`、`no-new-privileges:true`、`tmpfs /tmp`。
+
+### Fixed
+- **定时同步防重入**：`lib/scheduler-service.js` 新增全局互斥锁，阻止 cron 触发与手动执行并发重叠导致的重复浏览器启动。
+- **task-manager 写盘合并**：`lib/task-manager.js` 新增 `queueSave()` 合并并发写盘请求 + `saveRequestedDuringFlush` 脏标记二次落盘，减少高频状态更新时的重复 IO。
+- **历史数据源收敛**：前端历史记录从 `localStorage('dy_history')` 收敛为后端 `/api/history` 唯一权威源，消除双源数据漂移。删除 4 处冗余 `addToHistory()` 和 4 处冗余 `localStorage.filter` 逻辑。
+- **下载轮询超时保护**：主解析下载轮询增加连续失败 60 次上限（30 秒），超时后终止并提示用户。
+- **轮询 Timer 清理**：新增 `clearPollTimer()` 统一清理，避免 interval 被 `clearInterval()` 后仍残留在状态对象。
+- **前端非 JSON 错误容错**：`public/js/api.js` 检测 `Content-Type` 后再决定解析方式，后端返回纯文本错误时不再因 `.json()` 解析失败报错。
+
+### Added
+- **前端 Token 设置入口**：设置面板新增 API Token 输入框 + 保存/清除按钮，前端请求自动附带 `Authorization` header。
+- **安全测试套件**：新增 `tests/security.test.js`，11 个测试覆盖路径安全、URL 白名单、并发互斥、写盘合并、路由级校验。
+- `package.json` 新增 `npm test` 脚本。
+
+### Changed
+- `package.json` 包名从 `douyin-downloader` 改为 `video-downloader`，版本对齐 `8.3.0`。
+- `README.md` NAS 部署章节补充安全建议（修改 Token、不裸露公网）。
+- `README.md` axios 兼容性说明改为更中性的表述。
+
+### Metadata
+- Branch: `main`
+- Scope: `server.js`, `lib/douyin.js`, `lib/scheduler-service.js`, `lib/task-manager.js`, `routes/history.js`, `public/js/api.js`, `public/js/app.js`, `public/index.html`, `nas-deployment/*`, `package.json`, `README.md`, `tests/security.test.js`
+
+### Verified
+- `node --test tests/security.test.js` — 11/11 通过
+
+---
+
 ## [v8.2.1] - 2026-05-25 23:25 +08:00
 
 ### Fixed

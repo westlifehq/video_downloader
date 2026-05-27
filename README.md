@@ -188,7 +188,7 @@ npm run build-mac
 
 <details>
 <summary><b>pkg 打包兼容性说明</b></summary>
-提示：为了完美兼容 `pkg` 对动态加载模块的封装，项目中已将请求库 `axios` 锁定为原生友好的 `0.27.2` 经典版本。请勿轻易升级 axios 版本，否则可能导致 `.exe` 打包后运行时报错找不到模块。
+提示：为了完美兼容 `pkg` 对动态加载模块的封装，项目中暂时保留了当前 `axios` 版本。若后续升级，请先验证开发态、Docker 部署态与 `pkg` 打包产物的兼容性。
 </details>
 
 ---
@@ -208,6 +208,11 @@ npm run build-mac
 
 **使用方法：**
 进入 `nas-deployment` 目录，通过 `docker build` 或 `docker-compose up -d` 即可部署。该目录不会影响根目录的本地 PC 版使用体验。
+
+**安全建议（强烈推荐）：**
+- 请务必修改 `API_TOKEN` 为高强度随机字符串，并通过 `Authorization: Bearer <token>` 调用接口。
+- NAS / 远程部署默认禁用“打开本地文件位置”等仅适用于桌面模式的能力。
+- 不要将本服务直接裸露到公网，建议放在反向代理和认证层之后。
 
 `nas-deployment/docker-compose.yml` 默认已示例挂载以下数据：
 * 下载目录

@@ -15,9 +15,13 @@ COPY lib/ ./lib/
 COPY public/ ./public/
 COPY routes/ ./routes/
 
+RUN mkdir -p /app/user_data /downloads && chown -R pwuser:pwuser /app /downloads
+
 # 环境变量：让代码识别在 Docker 环境运行，且强制无头模式
 ENV IS_DOCKER=true
 ENV HEADLESS=true
+
+USER pwuser
 
 EXPOSE 3000
 

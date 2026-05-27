@@ -26,6 +26,7 @@ let msgSelectedItems = new Set();
 // ── 初始化 ──
 document.addEventListener('DOMContentLoaded', () => {
     loadConfig();
+    loadApiTokenSetting();
     loadHistory();
     loadFavStatus();
     loadLikedStatus();
@@ -106,6 +107,37 @@ async function saveConfig() {
     } catch (err) {
         showToast(err.message, 'error');
     }
+}
+
+function loadApiTokenSetting() {
+    const input = document.getElementById('apiTokenInput');
+    if (input) {
+        input.value = getApiToken();
+    }
+}
+
+function saveApiTokenSetting() {
+    const input = document.getElementById('apiTokenInput');
+    if (!input) return;
+
+    const token = input.value.trim();
+    if (!token) {
+        showToast('请输入 API Token', 'error');
+        return;
+    }
+
+    setApiToken(token);
+    input.value = token;
+    showToast('API Token 已保存', 'success');
+}
+
+function clearApiTokenSetting() {
+    const input = document.getElementById('apiTokenInput');
+    setApiToken('');
+    if (input) {
+        input.value = '';
+    }
+    showToast('API Token 已清除', 'success');
 }
 
 // ── 解析逻辑 ──
@@ -191,20 +223,28 @@ async function handleDownload(id) {
     }
 }
 
+function clearPollTimer(timerKey) {
+    if (!appState.pollTimers[timerKey]) return;
+    clearInterval(appState.pollTimers[timerKey]);
+    delete appState.pollTimers[timerKey];
+}
+
 function startPolling(id) {
     const item = appState.items[id];
-    if (appState.pollTimers[id]) clearInterval(appState.pollTimers[id]);
+    clearPollTimer(id);
 
+    let pollRetry = 0;
     appState.pollTimers[id] = setInterval(async () => {
         if (!item.taskId) return;
         try {
             const task = await api('GET', `/api/download/${item.taskId}`);
+            pollRetry = 0;
             item.progress = task.progress || 0;
             item.downloaded = task.downloaded || 0;
             item.total = task.total || 0;
 
             if (task.status === 'done') {
-                clearInterval(appState.pollTimers[id]);
+                clearPollTimer(id);
                 item.status = 'done';
                 item.fileSize = task.fileSize;
                 item.fileName = task.fileName;
@@ -212,7 +252,7 @@ function startPolling(id) {
                 updateCard(id);
                 onDownloadComplete(item);
             } else if (task.status === 'error') {
-                clearInterval(appState.pollTimers[id]);
+                clearPollTimer(id);
                 item.status = 'error';
                 item.downloadError = task.error;
                 updateCard(id);
@@ -221,40 +261,44 @@ function startPolling(id) {
                 updateCard(id);
             }
         } catch (err) {
-            console.error('轮询失败:', err);
+            pollRetry += 1;
+            if (pollRetry >= 60) {
+                clearPollTimer(id);
+                item.status = 'error';
+                item.downloadError = '下载轮询超时，请检查网络';
+                updateCard(id);
+                showToast(item.downloadError, 'error');
+            }
         }
     }, 500);
 }
 
 function onDownloadComplete(item) {
     showToast(`${item.info.type === 'image' ? '图文' : '视频'}下载完成！`, 'success');
-    addToHistory(item);
     loadHistory();
 }
 
 // ── 历史记录 ──
-function addToHistory(item) {
-    let history = JSON.parse(localStorage.getItem('dy_history') || '[]');
-    history.unshift({
-        title: item.fileName || item.info.title,
-        author: item.info ? item.info.author : '',
-        fileName: item.fileName,
-        filePath: item.filePath,
-        fileSize: item.fileSize,
-        cover: item.info ? item.info.cover : '',
-        time: Date.now(),
-    });
-    history = history.slice(0, 200);
-    localStorage.setItem('dy_history', JSON.stringify(history));
+async function fetchHistory() {
+    const history = await api('GET', '/api/history');
+    return Array.isArray(history) ? history : [];
 }
 
-function loadHistory() {
-    const history = JSON.parse(localStorage.getItem('dy_history') || '[]');
+async function loadHistory() {
     const section = document.getElementById('historySection');
     const list = document.getElementById('historyList');
     const filtersEl = document.getElementById('historyFilters');
 
     if (!section || !list) return;
+
+    let history = [];
+    try {
+        history = await fetchHistory();
+    } catch (err) {
+        section.style.display = 'none';
+        showToast('加载历史失败: ' + err.message, 'error');
+        return;
+    }
 
     if (history.length === 0) {
         section.style.display = 'none';
@@ -351,9 +395,9 @@ async function openHistoryFile(filePath) {
     }
 }
 
-async function deleteHistoryFile(filePath, index) {
+async function deleteHistoryFile(filePath) {
     if (!confirm('确定要从本地磁盘删除这个文件吗？此操作不可撤销。')) return;
-    
+
     try {
         await api('POST', '/api/history/delete', { filePath });
         showToast('文件已删除', 'success');
@@ -364,17 +408,19 @@ async function deleteHistoryFile(filePath, index) {
             showToast('删除失败: ' + err.message, 'error');
         }
     } finally {
-        let history = JSON.parse(localStorage.getItem('dy_history') || '[]');
-        history.splice(index, 1);
-        localStorage.setItem('dy_history', JSON.stringify(history));
         loadHistory();
     }
 }
 
-function clearHistory() {
-    localStorage.removeItem('dy_history');
+async function clearHistory() {
+    const history = await fetchHistory().catch(() => []);
+    if (!history.length) {
+        showToast('历史记录已清空', 'success');
+        return;
+    }
+
+    showToast('历史记录由服务端任务状态生成，无法在前端直接清空', 'info');
     loadHistory();
-    showToast('历史记录已清空', 'success');
 }
 
 // ── 设置面板 ──
@@ -624,12 +670,6 @@ async function downloadFavItem(idx) {
                     favDownloadStates[awemeId] = { status: 'done', filePath: task.filePath, fileName: task.fileName, fileSize: task.fileSize };
                     item.alreadyDownloaded = true;
                     renderFavList();
-                    addToHistory({
-                        fileName: task.fileName,
-                        filePath: task.filePath,
-                        fileSize: task.fileSize,
-                        info: { title: item.title, cover: item.cover, type: item.type },
-                    });
                     loadHistory();
                 } else if (task.status === 'error') {
                     clearInterval(pollId);
@@ -689,9 +729,6 @@ async function deleteFavFile(idx) {
     try {
         await api('POST', '/api/history/delete', { filePath: fp });
         showToast('文件已删除', 'success');
-        let history = JSON.parse(localStorage.getItem('dy_history') || '[]');
-        history = history.filter(h => h.filePath !== fp);
-        localStorage.setItem('dy_history', JSON.stringify(history));
         loadHistory();
     } catch (err) {
         if (err.message.includes('不存在')) {
@@ -902,12 +939,6 @@ async function downloadLikedItem(idx) {
                     likedDownloadStates[awemeId] = { status: 'done', filePath: task.filePath, fileName: task.fileName, fileSize: task.fileSize };
                     item.alreadyDownloaded = true;
                     renderLikedList();
-                    addToHistory({
-                        fileName: task.fileName,
-                        filePath: task.filePath,
-                        fileSize: task.fileSize,
-                        info: { title: item.title, cover: item.cover, type: item.type },
-                    });
                     loadHistory();
                 } else if (task.status === 'error') {
                     clearInterval(pollId);
@@ -967,9 +998,6 @@ async function deleteLikedFile(idx) {
     try {
         await api('POST', '/api/history/delete', { filePath: fp });
         showToast('文件已删除', 'success');
-        let history = JSON.parse(localStorage.getItem('dy_history') || '[]');
-        history = history.filter(h => h.filePath !== fp);
-        localStorage.setItem('dy_history', JSON.stringify(history));
         loadHistory();
     } catch (err) {
         if (err.message.includes('不存在')) {
@@ -1180,12 +1208,6 @@ async function downloadMsgItem(idx) {
                     msgDownloadStates[awemeId] = { status: 'done', filePath: task.filePath, fileName: task.fileName, fileSize: task.fileSize };
                     item.alreadyDownloaded = true;
                     renderMsgList();
-                    addToHistory({
-                        fileName: task.fileName,
-                        filePath: task.filePath,
-                        fileSize: task.fileSize,
-                        info: { title: item.title, cover: item.cover, type: item.type },
-                    });
                     loadHistory();
                 } else if (task.status === 'error') {
                     clearInterval(pollId);
@@ -1245,9 +1267,6 @@ async function deleteMsgFile(idx) {
     try {
         await api('POST', '/api/history/delete', { filePath: fp });
         showToast('文件已删除', 'success');
-        let history = JSON.parse(localStorage.getItem('dy_history') || '[]');
-        history = history.filter(h => h.filePath !== fp);
-        localStorage.setItem('dy_history', JSON.stringify(history));
         loadHistory();
     } catch (err) {
         if (err.message.includes('不存在')) {
@@ -1738,9 +1757,6 @@ async function deleteUserFile(cardId, idx) {
     try {
         await api('POST', '/api/history/delete', { filePath: fp });
         showToast('文件已删除', 'success');
-        let history = JSON.parse(localStorage.getItem('dy_history') || '[]');
-        history = history.filter(h => h.filePath !== fp);
-        localStorage.setItem('dy_history', JSON.stringify(history));
         loadHistory();
     } catch (err) {
         if (err.message.includes('不存在')) {

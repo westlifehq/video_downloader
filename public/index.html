@@ -282,6 +282,14 @@
             <button class="btn btn--primary btn--sm" onclick="saveConfig()">保存目录</button>
           </div>
         </div>
+        <div class="form-row">
+          <label>API Token</label>
+          <div style="display:flex;gap:8px;flex:1;flex-wrap:wrap;">
+            <input type="password" id="apiTokenInput" class="form-input" placeholder="远程部署启用 API_TOKEN 时填入" style="flex:1;min-width:220px;">
+            <button class="btn btn--primary btn--sm" onclick="saveApiTokenSetting()">保存 Token</button>
+            <button class="btn btn--ghost-sm" onclick="clearApiTokenSetting()">清除</button>
+          </div>
+        </div>
       </div>
     </section>
 
