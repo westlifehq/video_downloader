@@ -21,6 +21,18 @@
 - `nas-deployment/Dockerfile` 增加 `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD` / `PLAYWRIGHT_BROWSERS_PATH`（跳过浏览器重复下载）与 `HEALTHCHECK`。
 - `public/` 移除历史遗留的诊断截图 `fav_debug.png`。
 
+
+### UI
+- **暗黑精致化界面升级**（不改动功能）：
+  - 设计系统扩展：spacing/radius/typography/shadow/motion 全套 token
+  - 多层极光背景 + 缓慢漂移动画 + 细腻网格纹理
+  - 侧边栏升级：渐变背景 + 玻璃模糊、Logo 光泽、激活项渐变指示条、状态点呼吸动画
+  - 玻璃卡片：渐变面板 + 顶部高光线 + 精致阴影
+  - 输入框：深色背景 + 紫色 focus 光环 + 图标变色
+  - 主按钮：动态渐变扫光 + hover 流光效果
+  - 新增「快捷入口」3 卡片网格（主页同步 / 自动定时 / 下载历史），解决首屏空洞
+  - 解析卡片：封面放大至 140×196、作者徽章胶囊化、进度条带流光动画、时长胶囊带毛玻璃
+
 ### Verified
 - `node --test tests/security.test.js` — 11/11 通过
 - 本地与 N100 Docker 部署实测：`xhslink.cn` 新短链解析、小红书封面渲染（1080×1441 完整加载）、下载功能均正常
