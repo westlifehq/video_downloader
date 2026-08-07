@@ -480,6 +480,7 @@ async function loadFavStatus() {
 function updateFavUI(status) {
     const badge = document.getElementById('syncBadge');
     const accountBtnText = document.getElementById('favAccountBtnText');
+    const accountBtn = document.getElementById('syncAccountBtn');
     const syncBtn = document.getElementById('favSyncBtn');
 
     if (!syncBtn) return;
@@ -491,10 +492,12 @@ function updateFavUI(status) {
             if (badgeText) badgeText.textContent = status.lastSyncTime ? `同步 ${formatSyncTime(status.lastSyncTime)}` : '已登录';
         }
         if (accountBtnText) accountBtnText.textContent = '切换账号';
+        if (accountBtn) setBtnText(accountBtn, '已登录');
         syncBtn.disabled = false;
     } else {
         if (badge) badge.style.display = 'none';
         if (accountBtnText) accountBtnText.textContent = '登录';
+        if (accountBtn) setBtnText(accountBtn, '登录');
         syncBtn.disabled = true;
     }
 }
@@ -554,6 +557,14 @@ async function handleCookieSubmit() {
     }
 }
 
+// 兼容新旧按钮结构：优先 .btn-label 子元素，否则直接设置按钮文本
+function setBtnText(btn, text) {
+    if (!btn) return;
+    const label = btn.querySelector('.btn-label');
+    if (label) label.textContent = text;
+    else btn.textContent = text;
+}
+
 async function handleFavoritesSync() {
     const syncBtn = document.getElementById('favSyncBtn');
     if (!syncBtn) return;
@@ -561,7 +572,7 @@ async function handleFavoritesSync() {
     try {
         syncBtn.classList.add('syncing');
         syncBtn.disabled = true;
-        syncBtn.querySelector('.btn-label').textContent = '同步中 . . .';
+        setBtnText(syncBtn, '同步中 . . .');
 
         const result = await api('POST', '/api/favorites/sync', { maxCount });
         if (result.taskId) {
@@ -579,7 +590,7 @@ async function handleFavoritesSync() {
         }
         syncBtn.classList.remove('syncing');
         syncBtn.disabled = false;
-        syncBtn.querySelector('.btn-label').textContent = '同步收藏';
+        setBtnText(syncBtn, '同步收藏');
     }
 }
 
@@ -615,7 +626,7 @@ function pollFavSync(taskId) {
                 if (syncBtn) {
                     syncBtn.classList.remove('syncing');
                     syncBtn.disabled = false;
-                    syncBtn.querySelector('.btn-label').textContent = '同步收藏';
+                    setBtnText(syncBtn, '同步收藏');
                 }
                 loadFavStatus();
 
@@ -832,7 +843,7 @@ async function handleLikedSync() {
     try {
         syncBtn.classList.add('syncing');
         syncBtn.disabled = true;
-        syncBtn.querySelector('.btn-label').textContent = '同步中 . . .';
+        setBtnText(syncBtn, '同步中 . . .');
 
         const result = await api('POST', '/api/liked/sync', { maxCount });
         if (result.taskId) {
@@ -848,7 +859,7 @@ async function handleLikedSync() {
         }
         syncBtn.classList.remove('syncing');
         syncBtn.disabled = false;
-        syncBtn.querySelector('.btn-label').textContent = '同步喜欢';
+        setBtnText(syncBtn, '同步喜欢');
     }
 }
 
@@ -884,7 +895,7 @@ function pollLikedSync(taskId) {
                 if (syncBtn) {
                     syncBtn.classList.remove('syncing');
                     syncBtn.disabled = false;
-                    syncBtn.querySelector('.btn-label').textContent = '同步喜欢';
+                    setBtnText(syncBtn, '同步喜欢');
                 }
                 loadLikedStatus();
 
@@ -1101,7 +1112,7 @@ async function handleMsgSync() {
     try {
         syncBtn.classList.add('syncing');
         syncBtn.disabled = true;
-        syncBtn.querySelector('.btn-label').textContent = '同步中 . . .';
+        setBtnText(syncBtn, '同步中 . . .');
 
         const result = await api('POST', '/api/messages/sync', { maxCount });
         if (result.taskId) {
@@ -1117,7 +1128,7 @@ async function handleMsgSync() {
         }
         syncBtn.classList.remove('syncing');
         syncBtn.disabled = false;
-        syncBtn.querySelector('.btn-label').textContent = '同步私信';
+        setBtnText(syncBtn, '同步私信');
     }
 }
 
@@ -1153,7 +1164,7 @@ function pollMsgSync(taskId) {
                 if (syncBtn) {
                     syncBtn.classList.remove('syncing');
                     syncBtn.disabled = false;
-                    syncBtn.querySelector('.btn-label').textContent = '同步私信';
+                    setBtnText(syncBtn, '同步私信');
                 }
                 loadMsgStatus();
 
