@@ -122,6 +122,61 @@
         </button>
       </section>
 
+      <!-- 功能快入：3 张快捷入口卡片（解决首屏空洞） -->
+      <section class="quick-actions" aria-label="快捷入口">
+        <div class="quick-actions-header">
+          <span class="quick-actions-eyebrow">SHORTCUTS</span>
+          <span class="quick-actions-title">或从快捷入口开始</span>
+        </div>
+        <div class="quick-actions-grid">
+          <button class="quick-action-card" data-accent="violet" onclick="switchMainPanel('sync')" type="button">
+            <div class="quick-action-icon">
+              <span class="material-symbols-outlined">sync</span>
+            </div>
+            <div class="quick-action-body">
+              <span class="quick-action-title">主页同步</span>
+              <span class="quick-action-desc">扫码登录后批量抓取抖音收藏 / 喜欢 / 私信视频</span>
+              <div class="quick-action-meta">
+                <span class="quick-action-tag">扫码</span>
+                <span class="quick-action-tag">批量</span>
+                <span class="quick-action-tag">实时</span>
+              </div>
+            </div>
+            <span class="material-symbols-outlined quick-action-arrow">arrow_forward</span>
+          </button>
+          <button class="quick-action-card" data-accent="cyan" onclick="switchMainPanel('schedule')" type="button">
+            <div class="quick-action-icon">
+              <span class="material-symbols-outlined">schedule</span>
+            </div>
+            <div class="quick-action-body">
+              <span class="quick-action-title">自动定时任务</span>
+              <span class="quick-action-desc">按固定时间或随机时段自动同步，避开风控</span>
+              <div class="quick-action-meta">
+                <span class="quick-action-tag">cron</span>
+                <span class="quick-action-tag">随机</span>
+                <span class="quick-action-tag">日志</span>
+              </div>
+            </div>
+            <span class="material-symbols-outlined quick-action-arrow">arrow_forward</span>
+          </button>
+          <button class="quick-action-card" data-accent="pink" onclick="switchMainPanel('history')" type="button">
+            <div class="quick-action-icon">
+              <span class="material-symbols-outlined">history</span>
+            </div>
+            <div class="quick-action-body">
+              <span class="quick-action-title">下载历史</span>
+              <span class="quick-action-desc">查看已下载文件、按作者/时间筛选、定位物理位置</span>
+              <div class="quick-action-meta">
+                <span class="quick-action-tag">筛选</span>
+                <span class="quick-action-tag">定位</span>
+                <span class="quick-action-tag">删除</span>
+              </div>
+            </div>
+            <span class="material-symbols-outlined quick-action-arrow">arrow_forward</span>
+          </button>
+        </div>
+      </section>
+
       <div id="errorMsg" class="error-msg" style="display:none"></div>
       <div id="resultsContainer" class="results-container"></div>
     </div>
