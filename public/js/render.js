@@ -315,7 +315,7 @@ function updateCard(id) {
     setHtmlAndRestoreScroll(el, `
       <div class="video-card">
         <div class="video-cover-wrap">
-          <img class="video-cover" src="${escapeHTML(info.cover || '')}" alt="封面">
+          <img class="video-cover" src="${escapeHTML(info.cover || '')}" alt="封面" referrerpolicy="no-referrer">
           ${durationHtml}
         </div>
         <div class="video-meta">
@@ -328,7 +328,7 @@ function updateCard(id) {
             ${resHtml}
           </div>
           <button class="btn btn--download" onclick="handleDownload('${escapeHTML(id)}')" ${btnDisabled ? 'disabled' : ''}>
-            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg class="btn-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
               <polyline points="7 10 12 15 17 10"/>
               <line x1="12" y1="15" x2="12" y2="3"/>
@@ -444,7 +444,7 @@ function renderFavList() {
 function renderFavItemCard(item, isDownloadedSection) {
     const idx = item._idx;
     const coverHtml = item.cover
-        ? `<img src="${escapeHTML(item.cover)}" style="width:40px;height:40px;border-radius:6px;object-fit:cover;flex-shrink:0" onerror="this.style.display='none'">`
+        ? `<img src="${escapeHTML(item.cover)}" style="width:40px;height:40px;border-radius:6px;object-fit:cover;flex-shrink:0" referrerpolicy="no-referrer" onerror="this.style.display='none'">`
         : '';
 
     const dState = favDownloadStates[item.awemeId];
@@ -622,7 +622,7 @@ function renderLikedList() {
 function renderLikedItemCard(item, isDownloadedSection) {
     const idx = item._idx;
     const coverHtml = item.cover
-        ? `<img src="${escapeHTML(item.cover)}" style="width:40px;height:40px;border-radius:6px;object-fit:cover;flex-shrink:0" onerror="this.style.display='none'">`
+        ? `<img src="${escapeHTML(item.cover)}" style="width:40px;height:40px;border-radius:6px;object-fit:cover;flex-shrink:0" referrerpolicy="no-referrer" onerror="this.style.display='none'">`
         : '';
 
     const dState = likedDownloadStates[item.awemeId];
@@ -799,7 +799,7 @@ function renderMsgList() {
 function renderMsgItemCard(item, isDownloadedSection) {
     const idx = item._idx;
     const coverHtml = item.cover
-        ? `<img src="${escapeHTML(item.cover)}" style="width:40px;height:40px;border-radius:6px;object-fit:cover;flex-shrink:0" onerror="this.style.display='none'">`
+        ? `<img src="${escapeHTML(item.cover)}" style="width:40px;height:40px;border-radius:6px;object-fit:cover;flex-shrink:0" referrerpolicy="no-referrer" onerror="this.style.display='none'">`
         : '';
 
     const dState = msgDownloadStates[item.awemeId];
@@ -881,7 +881,7 @@ function renderUserItemCardHTML(cardId, uItem, isDownloadedSection) {
     const item = appState.items[cardId];
     const idx = uItem._idx;
     const coverHtml = uItem.cover
-        ? `<img src="${escapeHTML(uItem.cover)}" style="width:36px;height:36px;border-radius:6px;object-fit:cover;flex-shrink:0" onerror="this.style.display='none'">`
+        ? `<img src="${escapeHTML(uItem.cover)}" style="width:36px;height:36px;border-radius:6px;object-fit:cover;flex-shrink:0" referrerpolicy="no-referrer" onerror="this.style.display='none'">`
         : '';
 
     const dState = item.userDownloadStates[uItem.awemeId];

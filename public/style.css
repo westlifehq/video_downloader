@@ -2,7 +2,7 @@
    AERO Downloader - Glassmorphism Design System
    ═══════════════════════════════════════════ */
 
-@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap');
+/* 字体走本地/系统回退，不依赖 Google Fonts CDN */
 
 :root {
     /* Color System (Dark Neon Theme) */
@@ -518,6 +518,24 @@ body {
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
     display: inline-block;
+}
+
+/* ── 按钮图标尺寸兜底 ──
+   部分按钮内的 <svg> 只写了 viewBox、未设 width/height，
+   SVG 默认按 300px 渲染，会撑爆按钮与卡片（如“下载无水印原视频”箭头巨图）。
+   统一约束所有 .btn / .action-btn 内图标为 16px，防止同类问题复发。 */
+.btn svg,
+.action-btn svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+}
+
+/* 列表状态图标（error/success 等）同样兜底，避免默认 300px 渲染 */
+.fav-sync-item-status {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
 }
 
 @keyframes spin {

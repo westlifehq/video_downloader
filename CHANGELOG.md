@@ -1,3 +1,32 @@
+## [v8.3.2] - 2026-08-07
+
+### Fixed
+- **小红书新短链域名 `xhslink.cn` 支持**：小红书分享短链新增 `.cn` 域名，`routes/parse.js` 域名白名单与平台识别同步放行，修复新链接报「仅支持解析抖音 / 小红书链接」或被误判为抖音导致解析失败。
+- **小红书封面防盗链**：小红书 CDN（`sns-webpic*.xhscdn.com`）对非小红书 Referer 返回 403，导致封面在页面中显示为撕裂/破损图；所有外域封面 `<img>`（解析卡片、收藏/喜欢/私信/用户列表、下载历史）增加 `referrerpolicy="no-referrer"`，加载封面时不发送 Referer。
+- **分享文本尾部标点剥离**：`lib/douyin.js` `extractUrl()` 匹配时排除中文标点并剥离英文闭合标点，修复分享文案紧跟标点时 URL 混入导致请求失败。
+- **退出登录浏览器清理**：`lib/douyin-favorites.js` `logout()` 不再调用 BrowserContext 不存在的 `.contexts()` 方法，改为直接 `clearCookies()` + `close()`，修复浏览器进程泄漏与登录态无法彻底清理。
+- **服务稳定性**：`server.js` `unhandledRejection` 仅记录错误日志不再退出进程，单个异步错误（如一次网络请求失败）不再拖垮整个服务。
+- **按钮图标尺寸兜底**：修复下载按钮等未设 `width/height` 的 SVG 按默认 300px 渲染、撑爆卡片的问题；`public/style.css` 新增 `.btn svg` / `.action-btn svg` / `.fav-sync-item-status` 16px 尺寸兜底，`render.js` 下载按钮 SVG 补内联尺寸。
+- **本地化字体**：`public/index.html` 由 Google Fonts 外链改为本地 `public/fonts/`（含 `material-symbols-outlined.woff2`），国内访问不再依赖外网 CDN。
+
+### Security
+- **下载目录敏感路径前缀匹配**：`routes/config.js` 危险目录黑名单由精确匹配改为前缀匹配，禁止将 `/usr/local`、`/etc/nginx` 等敏感目录的子路径设为下载目录。
+- **SSRF 纵深防御**：`routes/parse.js` 短链重定向后的真实链接再次校验域名白名单，防止被重定向到任意内网/外部地址。
+- **同步条数上限**：`routes/sync.js` 收藏 / 喜欢 / 私信 / 用户主页同步 `maxCount` 统一规范化限制为 1~500，防止超大值导致 Playwright 长时间抓取。
+- **诊断截图不外泄**：`lib/douyin-favorites.js` 同步调试截图由 `public/` 移至 `user_data/debug/`，避免被静态服务对外暴露。
+- **测试用例健壮性**：`tests/security.test.js` mock 恢复包裹 `try/finally`，断言失败不再污染后续用例。
+
+### Changed
+- `package.json` 版本 `8.3.1` → `8.3.2`；axios 升级至 `^1.7.0`，uuid 升级至 `^11.1.1`（本地与 Docker 部署已验证）。
+- `nas-deployment/Dockerfile` 增加 `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD` / `PLAYWRIGHT_BROWSERS_PATH`（跳过浏览器重复下载）与 `HEALTHCHECK`。
+- `public/` 移除历史遗留的诊断截图 `fav_debug.png`。
+
+### Verified
+- `node --test tests/security.test.js` — 11/11 通过
+- 本地与 N100 Docker 部署实测：`xhslink.cn` 新短链解析、小红书封面渲染（1080×1441 完整加载）、下载功能均正常
+
+---
+
 # Changelog
 
 本文件记录项目的主要变更。

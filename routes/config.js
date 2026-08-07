@@ -22,30 +22,40 @@ router.get('/config', async (req, res) => {
  */
 router.post('/config', async (req, res) => {
     const { downloadDir } = req.body;
-    if (!downloadDir) {
+    if (!downloadDir || typeof downloadDir !== 'string') {
         return res.status(400).json({ error: '下载目录不能为空' });
     }
 
-    // P0 修复：校验 downloadDir 合法性，禁止设置为系统根目录或敏感路径
     const path = require('path');
-    const resolved = path.resolve(downloadDir);
-    const dangerous = ['/', '/etc', '/usr', '/bin', '/sbin', '/var', '/tmp', '/root', '/sys', '/proc',
-                       'C:\\', 'C:\\Windows', 'C:\\Windows\\System32'];
-    if (dangerous.includes(resolved) || dangerous.includes(resolved.replace(/[\\/]+$/, ''))) {
-        return res.status(400).json({ error: '禁止将下载目录设置为系统根目录或敏感路径' });
-    }
+
     // 必须为绝对路径
     if (!path.isAbsolute(downloadDir)) {
         return res.status(400).json({ error: '下载目录必须为绝对路径' });
     }
 
+    // 校验 downloadDir 合法性，禁止设置为系统根目录或敏感路径（含其子目录）
+    const resolved = path.resolve(downloadDir);
+    const dangerous = ['/', '/etc', '/usr', '/bin', '/sbin', '/var', '/tmp', '/root', '/sys', '/proc', '/boot', '/dev', '/lib', '/lib64', '/opt',
+                       'C:\\', 'C:\\Windows', 'C:\\Windows\\System32'];
+    // 前缀匹配：不仅禁止精确匹配，也禁止设置为敏感目录的子目录（如 /usr/local、/etc/nginx）
+    const trimmed = resolved.replace(/[\\/]+$/, '');
+    const isDangerous = dangerous.some(d => {
+        const dd = d.replace(/[\\/]+$/, '');
+        if (trimmed === dd) return true;
+        if (dd === '') return false;
+        return trimmed.startsWith(dd + '/') || trimmed.startsWith(dd + '\\');
+    });
+    if (isDangerous) {
+        return res.status(400).json({ error: '禁止将下载目录设置为系统根目录或敏感路径' });
+    }
+
     try {
-        if (!fsSync.existsSync(downloadDir)) {
+        if (!fsSync.existsSync(resolved)) {
             const fs = require('fs').promises;
-            await fs.mkdir(downloadDir, { recursive: true });
+            await fs.mkdir(resolved, { recursive: true });
         }
-        await configHelper.writeConfig({ downloadDir });
-        res.json({ success: true, downloadDir });
+        await configHelper.writeConfig({ downloadDir: resolved });
+        res.json({ success: true, downloadDir: resolved });
     } catch (err) {
         res.status(500).json({ error: '目录创建失败' });
     }
@@ -75,13 +85,17 @@ router.post('/schedule/config', async (req, res) => {
     if (syncMode && ['favorites', 'liked', 'both', 'messages', 'all'].includes(syncMode)) cfg.syncMode = syncMode;
     if (maxCount && Number.isInteger(maxCount) && maxCount > 0 && maxCount <= 500) cfg.maxCount = maxCount;
     if (triggerMode && ['fixed', 'random'].includes(triggerMode)) cfg.triggerMode = triggerMode;
-    const timeFormatRegex = /^\d{1,2}:\d{2}$/;
+    const isValidTimeStr = (s) => {
+        if (!/^\d{1,2}:\d{2}$/.test(s)) return false;
+        const [h, m] = s.split(':').map(Number);
+        return h >= 0 && h <= 23 && m >= 0 && m <= 59;
+    };
     if (rangeStart) {
-        if (!timeFormatRegex.test(rangeStart)) return res.status(400).json({ error: 'rangeStart 格式应为 HH:MM' });
+        if (!isValidTimeStr(rangeStart)) return res.status(400).json({ error: 'rangeStart 格式应为 HH:MM（0-23 时 / 0-59 分）' });
         cfg.rangeStart = rangeStart;
     }
     if (rangeEnd) {
-        if (!timeFormatRegex.test(rangeEnd)) return res.status(400).json({ error: 'rangeEnd 格式应为 HH:MM' });
+        if (!isValidTimeStr(rangeEnd)) return res.status(400).json({ error: 'rangeEnd 格式应为 HH:MM（0-23 时 / 0-59 分）' });
         cfg.rangeEnd = rangeEnd;
     }
     

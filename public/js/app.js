@@ -343,7 +343,7 @@ async function loadHistory() {
         const realIndex = history.indexOf(item);
         const placeholderHtml = `<div class="history-thumb-placeholder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg></div>`;
         const thumbHtml = item.cover
-            ? `<img class="history-thumb" src="${escapeHTML(item.cover)}" alt="" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">` + `<div class="history-thumb-placeholder" style="display:none;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg></div>`
+            ? `<img class="history-thumb" src="${escapeHTML(item.cover)}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">` + `<div class="history-thumb-placeholder" style="display:none;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg></div>`
             : placeholderHtml;
         const authorStr = item.author ? `<span style="font-size:11px;color:var(--c-text-muted);">@${escapeHTML(item.author)}</span>` : '';
         const timeStr = item.time ? `<span style="font-size:11px;color:var(--c-text-muted);">${new Date(item.time).toLocaleString('zh-CN', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}</span>` : '';
@@ -1477,7 +1477,7 @@ async function loadScheduleLogs() {
             </div>`;
         }).join('');
     } catch (err) {
-        logPanel.innerHTML = `<div style="color:var(--c-error);">加载失败: ${err.message}</div>`;
+        logPanel.innerHTML = `<div style="color:var(--c-error);">加载失败: ${escapeHTML(err.message)}</div>`;
     }
 }
 

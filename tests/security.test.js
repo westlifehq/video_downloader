@@ -89,18 +89,21 @@ test('history route returns completed download tasks sorted by startTime desc', 
     { id: '3', status: 'done', startTime: 300, fileName: 'c.mp4' }
   ]);
 
-  const layer = historyRouter.stack.find(item => item.route && item.route.path === '/history' && item.route.methods.get);
-  const handler = layer.route.stack[0].handle;
+  try {
+    const layer = historyRouter.stack.find(item => item.route && item.route.path === '/history' && item.route.methods.get);
+    const handler = layer.route.stack[0].handle;
 
-  let jsonPayload = null;
-  handler({}, {
-    json(payload) {
-      jsonPayload = payload;
-    }
-  });
+    let jsonPayload = null;
+    handler({}, {
+      json(payload) {
+        jsonPayload = payload;
+      }
+    });
 
-  assert.deepEqual(jsonPayload.map(item => item.id), ['3', '1']);
-  taskManager.getAllTasks = originalGetAllTasks;
+    assert.deepEqual(jsonPayload.map(item => item.id), ['3', '1']);
+  } finally {
+    taskManager.getAllTasks = originalGetAllTasks;
+  }
 });
 
 test('history delete route rejects when remote management disabled', async () => {

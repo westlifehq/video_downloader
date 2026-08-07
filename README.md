@@ -3,7 +3,7 @@
 > 🚀 一个基于 Node.js 构建的现代化、极简、高颜值的全平台视频内容解析及下载工具。
 
 ![UI Preview](https://img.shields.io/badge/Status-Active-success)
-![Version](https://img.shields.io/badge/Version-8.2.0-blue)
+![Version](https://img.shields.io/badge/Version-8.3.2-blue)
 ![Nodejs](https://img.shields.io/badge/Node.js-18.x-blue)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 
@@ -29,6 +29,18 @@
 ## 🆕 相比「新增喜欢功能」之后的详细更新
 
 以下内容为基于 `feat: add douyin liked sync support` 之后的持续迭代，方便老用户快速了解最近新增了什么：
+
+### 🆕 v8.3.2 更新（2026-08-07）
+
+- **修复小红书新短链无法解析**：小红书分享短链新增 `xhslink.cn` 域名，解析白名单与平台识别同步放行，修复「仅支持解析抖音 / 小红书链接」与误判为抖音导致的解析失败。
+- **修复小红书封面显示为撕裂/破损图**：小红书 CDN 对非小红书 Referer 返回 403，所有外域封面 `<img>` 增加 `referrerpolicy="no-referrer"` 彻底修复。
+- **修复分享文本尾部标点混入 URL**：`extractUrl()` 匹配时排除中文标点并剥离英文闭合标点，提升分享文案解析成功率。
+- **修复退出登录浏览器进程泄漏**：`logout()` 修正 BrowserContext 清理逻辑，登录态可被彻底清除。
+- **修复按钮图标撑爆卡片**：修复下载按钮等未设尺寸的 SVG 按 300px 默认渲染的问题，统一按钮图标尺寸兜底。
+- **服务稳定性**：`unhandledRejection` 改为仅记录日志不再退出进程，单个异步错误不再拖垮整个服务。
+- **安全加固**：下载目录敏感路径前缀匹配、SSRF 重定向白名单复检、同步条数上限 1~500、诊断截图移出 `public/`。
+- **本地化字体**：Google Fonts 外链替换为本地字体文件，国内访问不再依赖外网 CDN。
+- 详见 [CHANGELOG.md](CHANGELOG.md)。
 
 ### 0. 🔧 主页同步 Bug 修复与功能收敛 (v8.2.0)
 

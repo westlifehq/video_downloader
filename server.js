@@ -10,7 +10,21 @@ const REMOTE_MANAGEMENT_DISABLED = process.env.DISABLE_REMOTE_FILE_ACTIONS === '
 // 中间件
 app.use(express.json());
 
-app.use((req, res, next) => {
+// 静态资源（Web 界面）不做鉴权，否则启用 API_TOKEN 后浏览器无法打开页面；
+// API 接口仍由下方鉴权中间件保护。
+app.use(express.static(path.join(__dirname, 'public'), {
+  etag: false,
+  maxAge: 0,
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.js') || filePath.endsWith('.css') || filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+    }
+  }
+}));
+
+// API 鉴权中间件：仅保护 /api 路由
+app.use('/api', (req, res, next) => {
   if (!API_TOKEN) {
     return next();
   }
@@ -22,17 +36,6 @@ app.use((req, res, next) => {
 
   res.status(401).json({ error: '未授权访问' });
 });
-
-app.use(express.static(path.join(__dirname, 'public'), {
-  etag: false,
-  maxAge: 0,
-  setHeaders: (res, filePath) => {
-    if (filePath.endsWith('.js') || filePath.endsWith('.css') || filePath.endsWith('.html')) {
-      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-      res.setHeader('Pragma', 'no-cache');
-    }
-  }
-}));
 
 // 全局异常捕获，防止黑窗口闪退
 function pressAnyKeyToExit() {
@@ -54,9 +57,10 @@ process.on('uncaughtException', (err) => {
     pressAnyKeyToExit();
 });
 
+// 未捕获的 Promise 错误仅记录日志，不退出进程——
+// 单个异步错误（如一次网络请求失败）不应拖垮整个服务。
 process.on('unhandledRejection', (err) => {
     console.error('\n[未捕获的 Promise 错误]', err);
-    pressAnyKeyToExit();
 });
 
 // 引入模块化路由

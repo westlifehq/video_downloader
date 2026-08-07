@@ -8,6 +8,15 @@ const favorites = require('../lib/douyin-favorites');
 const configHelper = require('../lib/config');
 const taskManager = require('../lib/task-manager');
 
+/**
+ * 规范化同步条数：必须是正整数，且上限 500，防止恶意/误传超大值
+ * 导致 Playwright 长时间抓取、内存占用过大。
+ */
+function normalizeMaxCount(raw) {
+    const n = Number(raw);
+    return Number.isInteger(n) && n > 0 ? Math.min(n, 500) : 50;
+}
+
 // ═══════════════════════════════════════════
 // 收藏同步 API
 // ═══════════════════════════════════════════
@@ -59,7 +68,7 @@ router.post('/favorites/cookie-login', async (req, res) => {
 });
 
 router.post('/favorites/sync', async (req, res) => {
-    const maxCount = req.body.maxCount || 50;
+    const maxCount = normalizeMaxCount(req.body.maxCount);
 
     // 检查是否已有同步任务在进行
     const tasks = taskManager.getAllTasks('favSync');
@@ -194,7 +203,7 @@ router.get('/favorites/sync/:taskId', (req, res) => {
 // ═══════════════════════════════════════════
 
 router.post('/liked/sync', async (req, res) => {
-    const maxCount = req.body.maxCount || 50;
+    const maxCount = normalizeMaxCount(req.body.maxCount);
 
     const tasks = taskManager.getAllTasks('likedSync');
     for (const task of tasks) {
@@ -328,7 +337,7 @@ router.get('/liked/sync/:taskId', (req, res) => {
 // ═══════════════════════════════════════════
 
 router.post('/messages/sync', async (req, res) => {
-    const maxCount = req.body.maxCount || 50;
+    const maxCount = normalizeMaxCount(req.body.maxCount);
 
     const tasks = taskManager.getAllTasks('msgSync');
     for (const task of tasks) {
@@ -464,7 +473,7 @@ router.get('/messages/sync/:taskId', (req, res) => {
 
 router.post('/user/sync', async (req, res) => {
     const { secUid } = req.body;
-    const maxCount = req.body.maxCount || 50;
+    const maxCount = normalizeMaxCount(req.body.maxCount);
     const tabType = req.body.tabType || 'post';
 
     // 仅支持 post 和 like（抖音 web 端不支持查看他人收藏/收藏夹）
