@@ -1,6 +1,6 @@
 {
   "name": "video-downloader",
-  "version": "8.3.2",
+  "version": "8.3.3",
   "description": "全平台视频内容解析与下载工具",
   "main": "server.js",
   "scripts": {
