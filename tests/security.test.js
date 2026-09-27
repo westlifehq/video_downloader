@@ -152,6 +152,13 @@ test('history delete route rejects missing file path', async () => {
   assert.match(jsonPayload.error, /未提供文件路径/);
 });
 
+test('sanitizeFilename limits output to safe UTF-8 byte length', () => {
+  const superLongTitle = '这是一个非常非常长的绘本标题，后面跟着一大堆介绍和标签'.repeat(10);
+  const sanitized = douyin.sanitizeFilename(superLongTitle);
+  assert.ok(Buffer.byteLength(sanitized, 'utf8') <= 150);
+  assert.ok(Buffer.byteLength(sanitized + '_7629214414708788532.mp4', 'utf8') <= 255);
+});
+
 test.after(() => {
   if (originalDownloadDir === undefined) {
     delete process.env.DOWNLOAD_DIR;
