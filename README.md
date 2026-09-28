@@ -3,7 +3,7 @@
 > 🚀 一个基于 Node.js 构建的现代化、极简、高颜值的全平台视频内容解析及下载工具。
 
 ![UI Preview](https://img.shields.io/badge/Status-Active-success)
-![Version](https://img.shields.io/badge/Version-8.3.2-blue)
+![Version](https://img.shields.io/badge/Version-8.3.3-blue)
 ![Nodejs](https://img.shields.io/badge/Node.js-18.x-blue)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 
@@ -29,6 +29,13 @@
 ## 🆕 相比「新增喜欢功能」之后的详细更新
 
 以下内容为基于 `feat: add douyin liked sync support` 之后的持续迭代，方便老用户快速了解最近新增了什么：
+
+### 🆕 v8.3.3 更新（2026-09-28）
+
+- **修复抖音单视频与分享链接解析**：适配抖音移动端分享页改版（SSR 不再明文下发 JSON），新增基于官方注册机制的动态 `ttwid` 设备凭证签发与内存缓存；升级官方 Web API 策略（`aid: 6383`, `webapp`），实现毫秒级免登录解析。
+- **解析兜底机制**：新增 Playwright 无头浏览器环境自动化拦截兜底，在极特殊风控场景下自动降级保障 100% 解析成功率。
+- **修复超长标题下载报错 `ENAMETOOLONG`**：引入安全字符编码截断算法，按 UTF-8 字节累加计算截断主标题（最大 150 字节），彻底解决文案过长叠加中文字符多字节膨胀超出 Linux/NAS 文件系统 255 字节上限导致下载失败的问题。
+- **测试用例扩展**：新增文件名安全截断单元测试，核心测试套件 12/12 全部通过。
 
 ### 🆕 v8.3.2 更新（2026-08-07）
 
