@@ -210,6 +210,7 @@ async function handleDownload(id) {
             images: item.info.images,
             title: item.info.title,
             awemeId: item.info.awemeId,
+            platform: item.info.platform || 'douyin',
         };
 
         const result = await api('POST', '/api/download', payload);

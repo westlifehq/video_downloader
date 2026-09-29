@@ -3,7 +3,7 @@
 > 🚀 一个基于 Node.js 构建的现代化、极简、高颜值的全平台视频内容解析及下载工具。
 
 ![UI Preview](https://img.shields.io/badge/Status-Active-success)
-![Version](https://img.shields.io/badge/Version-8.3.4-blue)
+![Version](https://img.shields.io/badge/Version-8.3.5-blue)
 ![Nodejs](https://img.shields.io/badge/Node.js-18.x-blue)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 
@@ -16,7 +16,7 @@
 - **Cookie 直登优化**：前端手动注入 `sessionid` 时不再依赖 Playwright 浏览器启动，网页内即可直接完成凭证绑定，避免因浏览器内核未安装导致登录失败。
 - **Windows 一键启动修复**：`run.cmd` 与 `run-downloader.cmd` 现已支持自动回退到 Node.js 模式，并在首次运行时自动安装 npm 依赖与 Playwright Chromium。
 - **物理文件双向同步**：支持在下载历史和收藏面板直接「打开文件位置」或「从磁盘物理删除」，实现下载状态与本地文件的实时对齐。
-- **跨平台解析**：支持 **抖音 (Douyin)** 和 **小红书 (Xiaohongshu)** 视频内容解析，自动识别平台并切换引擎。
+- **跨平台解析 (v8.3.5)**：支持 **抖音 (Douyin)** 和 **小红书 (Xiaohongshu)** 视频/图文内容解析。小红书全面升级为 axios 通道并复用短链重定向响应体，规避边缘节点 TLS 指纹风控，支持多编码视频流自动选取与无水印图集下载。
 - **无水印原画质**：直取底层接口，下载官方无压缩、无水印的 1080P/720P 原视频。
 - **自动短链追踪**：支持分享短链接，自动识别并跟随 302 重定向。
 - **极速批量处理**：支持在输入框同时粘贴多条链接，自动剥离文字，多线程并行解析与下载。
@@ -29,6 +29,16 @@
 ## 🆕 相比「新增喜欢功能」之后的详细更新
 
 以下内容为基于 `feat: add douyin liked sync support` 之后的持续迭代，方便老用户快速了解最近新增了什么：
+
+### 🆕 v8.3.5 更新（2026-09-29）
+
+- **小红书解析全面修复**：
+  - 小红书边缘节点升级反爬，会识别 curl（LibreSSL）的 TLS 指纹对笔记页一律返回 302 跳登录页。`lib/xhs.js` 抓取通道由 spawn curl 改为 axios（Node TLS 栈不受影响）。
+  - 复用短链重定向落地页（`discovery/item`）响应体中自带的 `window.__INITIAL_STATE__`，省去对 `explore/{noteId}` 的二次请求（免除风控拦截）。
+  - 直接链接场景保留携带 `xsec_token` 的 explore 重试兜底；笔记数据提取增加 `currentNoteId` / 首个 entry 兜底；视频流选取增加 h264/h265/av1/h266 多编码与 `defaultStream` 优先选取。
+- **小红书图集下载 403 修复**：
+  - 图集笔记 `videoUrl` 为空，`routes/download.js` 的 platform 自动补全同时检查 `images` 数组中的 CDN 域名。
+  - `public/js/app.js` `handleDownload` 下载 payload 补传 `platform` 字段双保险。
 
 ### 🆕 v8.3.4 更新（2026-09-28）
 

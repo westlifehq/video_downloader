@@ -16,9 +16,12 @@ router.post('/download', async (req, res) => {
     let { platform } = req.body;
     const isImage = type === 'image';
 
-    // 自动补全 platform，防止前端缓存了旧版 app.js 没传 platform 参数
-    if (!platform && videoUrl) {
-        if (videoUrl.includes('xhscdn.com') || videoUrl.includes('xiaohongshu.com')) {
+    // 自动补全 platform，防止前端缓存了旧版 app.js 没传 platform 参数。
+    // 图集笔记 videoUrl 为空，必须同时检查 images 里的 CDN 域名，
+    // 否则图集会用抖音 Referer 请求小红书 CDN 被 403 拒绝。
+    if (!platform) {
+        const urls = [videoUrl, ...(Array.isArray(images) ? images : [])].filter(Boolean);
+        if (urls.some(u => u.includes('xhscdn.com') || u.includes('xiaohongshu.com'))) {
             platform = 'xhs';
         }
     }

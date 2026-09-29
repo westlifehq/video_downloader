@@ -1,3 +1,15 @@
+## [v8.3.5] - 2026-09-29
+
+### Fixed
+- **小红书解析全面修复**：小红书边缘节点升级反爬，会识别 curl（LibreSSL）的 TLS 指纹，对笔记页一律 302 跳登录页，导致解析全部失败。`lib/xhs.js` 抓取通道由 spawn curl 改为 axios（Node TLS 栈不受影响），并复用短链重定向落地页（`discovery/item`）响应体中自带的 `window.__INITIAL_STATE__`，省去对 `explore/{noteId}` 的二次请求（该二次请求更易触发风控）；直接链接场景保留携带 `xsec_token` 的 explore 重试兜底，笔记数据提取增加 `currentNoteId` / 首个 entry 兜底，视频流选取增加 h264/h265/av1/h266 多编码与 `defaultStream` 优先。
+- **小红书图集下载 403 修复**：图集笔记 `videoUrl` 为空，`routes/download.js` 的 platform 自动补全仅检查 `videoUrl` 而失效，导致图集以抖音 Referer 请求小红书 CDN 被 403 拒绝；补全逻辑同时检查 `images` 数组的 CDN 域名，`public/js/app.js` `handleDownload` 下载 payload 补传 `platform` 字段双保险。
+
+### Verified
+- 自动化安全与核心测试套件 12/12 全部通过。
+- 经真实笔记实测：短链（`xhslink.cn`）、浏览器直接链接均可秒级解析；视频笔记下载成功（3 MB 有效 MP4）、图集笔记下载成功。
+
+---
+
 ## [v8.3.4] - 2026-09-28
 
 ### Fixed
