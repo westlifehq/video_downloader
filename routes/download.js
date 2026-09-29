@@ -12,7 +12,7 @@ const taskManager = require('../lib/task-manager');
  * POST /api/download — 开始下载视频/图集
  */
 router.post('/download', async (req, res) => {
-    const { videoUrl, title, awemeId, type, images, subDir } = req.body;
+    const { videoUrl, title, awemeId, type, images, livePhotos, subDir } = req.body;
     let { platform } = req.body;
     const isImage = type === 'image';
 
@@ -42,7 +42,9 @@ router.post('/download', async (req, res) => {
 
     // 生成文件名或目录名
     const safeName = douyin.sanitizeFilename(title || awemeId || 'douyin');
-    const fileName = isImage ? `[图集]_${safeName}` : `${safeName}_${awemeId || Date.now()}.mp4`;
+    const isLivePhoto = isImage && Array.isArray(livePhotos) && livePhotos.length > 0;
+    const folderPrefix = isLivePhoto ? '[实况图]_' : '[图集]_';
+    const fileName = isImage ? `${folderPrefix}${safeName}` : `${safeName}_${awemeId || Date.now()}.mp4`;
     const savePath = path.join(downloadDir, fileName);
 
     const taskId = uuidv4();
@@ -69,7 +71,7 @@ router.post('/download', async (req, res) => {
             if (isImage) {
                 result = await douyin.downloadImages(images, savePath, async (progress, downloaded, total) => {
                     await taskManager.updateTask('download', taskId, { progress, downloaded, total });
-                }, referer);
+                }, referer, livePhotos);
             } else {
                 result = await douyin.downloadVideo(videoUrl, savePath, async (progress, downloaded, total) => {
                     await taskManager.updateTask('download', taskId, { progress, downloaded, total });

@@ -260,6 +260,7 @@ function updateCard(id) {
     }
 
     const isImage = info.type === 'image';
+    const isLive = isImage && Array.isArray(info.livePhotos) && info.livePhotos.length > 0;
 
     let durationHtml = '';
     if (!isImage && info.duration) {
@@ -267,6 +268,9 @@ function updateCard(id) {
         const m = Math.floor(sec / 60);
         const s = sec % 60;
         durationHtml = `<div class="video-duration">${m}:${s.toString().padStart(2, '0')}</div>`;
+    } else if (isLive) {
+        const count = info.images ? info.images.length : 0;
+        durationHtml = `<div class="video-duration" style="background:#059669">实况图: ${count}P</div>`;
     } else if (isImage) {
         const count = info.images ? info.images.length : 0;
         durationHtml = `<div class="video-duration" style="background:var(--c-primary)">图文: ${count}P</div>`;
@@ -275,12 +279,14 @@ function updateCard(id) {
     let resHtml = '';
     if (!isImage && info.width && info.height) {
         resHtml = `<span class="spec">${info.width} × ${info.height}</span>`;
+    } else if (isLive) {
+        resHtml = `<span class="spec">实况动图 + 高清原图打包</span>`;
     } else if (isImage) {
         resHtml = `<span class="spec">图集无水印下载</span>`;
     }
 
     const btnDisabled = item.status === 'downloading' || item.status === 'done';
-    let btnText = isImage ? '下载全部高清源图' : '下载无水印原视频';
+    let btnText = isLive ? '下载实况动图与原图' : (isImage ? '下载全部高清源图' : '下载无水印原视频');
     if (item.status === 'downloading') btnText = '下载中...';
     if (item.status === 'done') btnText = '✓ 已完成';
 
