@@ -12,7 +12,7 @@ const taskManager = require('../lib/task-manager');
  * POST /api/download — 开始下载视频/图集
  */
 router.post('/download', async (req, res) => {
-    const { videoUrl, title, awemeId, type, images, livePhotos, subDir } = req.body;
+    const { videoUrl, title, awemeId, type, images, livePhotos, cover, subDir } = req.body;
     let { platform } = req.body;
     const isImage = type === 'image';
 
@@ -56,6 +56,9 @@ router.post('/download', async (req, res) => {
         filePath: savePath,
         fileName,
         title,
+        // 封面与 awemeId 落库，供下载历史页渲染缩略图（旧记录无此字段，前端已有占位兜底）
+        cover: typeof cover === 'string' ? cover : '',
+        awemeId: awemeId || '',
         error: null
     });
 

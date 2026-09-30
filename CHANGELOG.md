@@ -1,3 +1,27 @@
+## [v8.5.0] - 2026-09-30
+
+### Added
+- **全新浅色渐变界面（UI v4）**：`public/index.html` 由侧栏布局重构为顶部五项导航（链接解析 / 账号同步 / 定时任务 / 下载历史 / 设置），删除首页写死的 128、4.2 GB、99.2% 等假统计与宣传卡片；`public/style.css` 全面重做为浅色底 + 冰蓝/暖杏/浅绿径向渐变背景（18 秒缓慢交替、固定基础层保证首屏有色）、透明毛玻璃顶部导航（去白色底条与分隔线），字号回调（导航/主要说明约 14px、常用按钮约 13px、辅助文字 12–13px），新增轻量入场 / hover / 进度动效并在 `prefers-reduced-motion` 下静止背景；`public/js/render.js` 动态模板同步适配浅色（用户头像 emoji 改线条 SVG、移除同步分组彩色 emoji、下拉框与结果卡片浅色化）。`sessionid` 输入改为 `password` 类型不再明文展示；新增键盘跳转链接、表单标签与 aria 状态；定时任务入口切到实际定时配置，账号同步入口更名为「账号同步」。
+- **下载历史封面缩略图**：`public/js/app.js` 全部 5 处下载调用点（链接解析 / 收藏 / 喜欢 / 私信 / 用户主页同步）payload 新增 `cover` 字段；`routes/download.js` 接收 `cover` 与 `awemeId` 并写入下载任务记录，`/api/history` 原样透传，历史页 `item.cover` 有值即渲染封面缩略图（沿用现有 `escapeHTML` 防注入与 `referrerpolicy="no-referrer"` 防盗链机制）。
+
+### Fixed
+- **下载历史页一律显示占位图标**：历史缩略图模板一直读取 `item.cover`，但下载链路（前端 payload 与后端落库）自仓库建立起从未记录过封面字段（`git log -S cover` 对 `routes/download.js` / `lib/task-manager.js` 全历史为空），线上 `tasks_history.json` 既有 230 条任务 0 条带 cover。本次为下载链路补齐 cover 透传后，新产生的下载记录即在历史页显示封面；存量旧记录因当时未保存封面 URL 与 awemeId、无任何可反查来源，无法回填，继续显示占位图标。
+
+### Changed
+- **交互修正**：Ctrl/Command+Enter 从重复请求改为单次解析（删除 HTML 内第二套快捷键监听，统一收敛到 app.js）；Enter 解析增加 `!e.isComposing` 与 `!e.repeat` 防输入法确认/长按误触；下载路径显示由每秒轮询改为 `loadConfig` 后派发 `input` 事件即时更新；同步停止按钮与错误文案适配浅色视觉（移除彩色错误 emoji）。
+- `package.json` / `package-lock.json` 版本 8.4.0 → 8.5.0。
+
+### Verified
+- 自动化安全与核心测试套件 12/12 全部通过。
+- 隔离预览回归 `ui-check` 6/6 通过（顶部五项导航取代侧栏、无虚假统计、Ctrl+Enter 单次解析、五个导航页面可达、360px 手机无横向溢出、无 JS 运行异常）；`preview-check` 模拟全流程 PASS（解析、下载进度与完成、历史、账号绑定、收藏多选、随机时段定时配置、日志、主页解析卡片、360/390/768px 响应式、渐变接缝检查）。
+- NAS Docker 生产环境已按同版本重建部署并完成上线验收（页面 200、五项导航齐全、API 全 200、下载目录 / 会话 / 定时配置数据完整、Mac 经 Tailscale 远程实测 0 JS 错误）。
+
+### Metadata
+- Branch: `main`（UI v4 部分合并自 `ui-change` 分支）
+- Scope: `public/index.html`, `public/style.css`, `public/js/app.js`, `public/js/render.js`, `routes/download.js`, `package.json`, `package-lock.json`, `CHANGELOG.md`, `README.md`
+
+---
+
 ## [v8.3.5] - 2026-09-29
 
 ### Fixed
