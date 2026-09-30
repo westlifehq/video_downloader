@@ -36,7 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const urlInput = document.getElementById('urlInput');
     if (urlInput) {
         urlInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
+            if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && !e.repeat) {
                 e.preventDefault();
                 handleParse();
             }
@@ -88,7 +88,10 @@ async function loadConfig() {
     try {
         const config = await api('GET', '/api/config');
         const dirInput = document.getElementById('downloadDir');
-        if (dirInput) dirInput.value = config.downloadDir || '';
+        if (dirInput) {
+            dirInput.value = config.downloadDir || '';
+            dirInput.dispatchEvent(new Event('input'));
+        }
     } catch (err) {
         console.error('加载配置失败:', err);
     }
@@ -614,7 +617,7 @@ function pollFavSync(taskId) {
                             <span class="fav-sync-phase">${escapeHTML(task.phase || '正在获取收藏列表...')}</span>
                             <span class="fav-sync-counter" style="margin-left:8px">已发现 ${task.collected || 0} 条</span>
                         </div>
-                        <button class="btn btn--stop" style="padding:4px 10px;font-size:11px;border-radius:6px;color:white;border:none;cursor:pointer;" onclick="stopFavSync('${taskId}')">停止打断</button>
+                        <button class="btn btn--stop" style="padding:4px 10px;font-size:11px;border-radius:6px;color:var(--c-error);border:none;cursor:pointer;" onclick="stopFavSync('${taskId}')">停止打断</button>
                     </div>
                     <div class="fav-sync-progress">
                         <div class="fav-sync-progress-fill indeterminate" style="width:30%"></div>
@@ -633,7 +636,7 @@ function pollFavSync(taskId) {
                 loadFavStatus();
 
                 if (task.status === 'error') {
-                    panel.innerHTML = `<div class="fav-login-hint" style="color:var(--c-error)">❌ ${escapeHTML(task.error || '获取失败')}</div>`;
+                    panel.innerHTML = `<div class="fav-login-hint" style="color:var(--c-error)">同步失败：${escapeHTML(task.error || '获取失败')}</div>`;
                     showToast('获取收藏列表失败', 'error');
                 } else {
                     favSyncedItems = task.items || [];
@@ -884,7 +887,7 @@ function pollLikedSync(taskId) {
                             <span class="fav-sync-phase">${escapeHTML(task.phase || '正在获取喜欢列表...')}</span>
                             <span class="fav-sync-counter" style="margin-left:8px">已发现 ${task.collected || 0} 条</span>
                         </div>
-                        <button class="btn btn--stop" style="padding:4px 10px;font-size:11px;border-radius:6px;color:white;border:none;cursor:pointer;" onclick="stopLikedSync('${taskId}')">停止打断</button>
+                        <button class="btn btn--stop" style="padding:4px 10px;font-size:11px;border-radius:6px;color:var(--c-error);border:none;cursor:pointer;" onclick="stopLikedSync('${taskId}')">停止打断</button>
                     </div>
                     <div class="fav-sync-progress">
                         <div class="fav-sync-progress-fill indeterminate" style="width:30%"></div>
@@ -903,7 +906,7 @@ function pollLikedSync(taskId) {
                 loadLikedStatus();
 
                 if (task.status === 'error') {
-                    panel.innerHTML = `<div class="fav-login-hint" style="color:var(--c-error)">❌ ${escapeHTML(task.error || '获取失败')}</div>`;
+                    panel.innerHTML = `<div class="fav-login-hint" style="color:var(--c-error)">同步失败：${escapeHTML(task.error || '获取失败')}</div>`;
                     showToast('获取喜欢列表失败', 'error');
                 } else {
                     likedSyncedItems = task.items || [];
@@ -1154,7 +1157,7 @@ function pollMsgSync(taskId) {
                             <span class="fav-sync-phase">${escapeHTML(task.phase || '正在扫描私信...')}</span>
                             <span class="fav-sync-counter" style="margin-left:8px">已发现 ${task.collected || 0} 条</span>
                         </div>
-                        <button class="btn btn--stop" style="padding:4px 10px;font-size:11px;border-radius:6px;color:white;border:none;cursor:pointer;" onclick="stopMsgSync('${taskId}')">停止打断</button>
+                        <button class="btn btn--stop" style="padding:4px 10px;font-size:11px;border-radius:6px;color:var(--c-error);border:none;cursor:pointer;" onclick="stopMsgSync('${taskId}')">停止打断</button>
                     </div>
                     <div class="fav-sync-progress">
                         <div class="fav-sync-progress-fill indeterminate" style="width:30%"></div>
@@ -1173,7 +1176,7 @@ function pollMsgSync(taskId) {
                 loadMsgStatus();
 
                 if (task.status === 'error') {
-                    panel.innerHTML = `<div class="fav-login-hint" style="color:var(--c-error)">❌ ${escapeHTML(task.error || '获取失败')}</div>`;
+                    panel.innerHTML = `<div class="fav-login-hint" style="color:var(--c-error)">同步失败：${escapeHTML(task.error || '获取失败')}</div>`;
                     showToast('获取私信视频列表失败', 'error');
                 } else {
                     msgSyncedItems = task.items || [];

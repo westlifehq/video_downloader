@@ -81,19 +81,19 @@ function updateCard(id) {
               <div class="video-card user-sync-card" style="flex-direction:column; align-items:stretch;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                   <div style="display:flex; align-items:center; gap:8px;">
-                    <div class="author-avatar" style="width:36px; height:36px; border-radius:50%; background:var(--c-primary); display:flex; align-items:center; justify-content:center; font-weight:bold; color:white; font-size:18px;">👤</div>
+                    <div class="author-avatar" style="width:36px; height:36px; border-radius:50%; background:var(--sub); display:flex; align-items:center; justify-content:center; font-weight:bold; color:var(--text); font-size:18px;"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="10" cy="7" r="3"/><path d="M4 17a6 6 0 0 1 12 0"/></svg></div>
                     <div>
-                      <h3 style="font-size:15px; font-weight:600; color:white; margin:0;">${escapeHTML(item.nickname || info.author?.nickname || '抖音用户')}</h3>
+                      <h3 style="font-size:15px; font-weight:600; color:var(--text); margin:0;">${escapeHTML(item.nickname || info.author?.nickname || '抖音用户')}</h3>
                       <p style="font-size:12px; color:var(--c-text-muted); margin:0;">检测到这是一个抖音用户主页，可以同步并批量下载其作品或公开喜欢视频。</p>
                     </div>
                   </div>
                 </div>
                 <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                  <select id="user-sync-type-${id}" class="select-field" style="width:110px; display:inline-block; height:36px; padding:0 8px; border-radius:6px; background:rgba(255,255,255,0.05); color:white; border:1px solid rgba(255,255,255,0.1);" onchange="appState.items['${id}'].syncType = this.value">
+                  <select id="user-sync-type-${id}" class="select-field" style="width:110px; display:inline-block; height:36px; padding:0 8px; border-radius:6px; background:var(--border-soft); color:var(--text); border:1px solid var(--border);" onchange="appState.items['${id}'].syncType = this.value">
                     <option value="post" ${item.syncType === 'post' ? 'selected' : ''}>个人作品</option>
                     <option value="like" ${item.syncType === 'like' ? 'selected' : ''}>公开喜欢</option>
                   </select>
-                  <select id="user-sync-count-${id}" class="select-field" style="width:110px; display:inline-block; height:36px; padding:0 8px; border-radius:6px; background:rgba(255,255,255,0.05); color:white; border:1px solid rgba(255,255,255,0.1);" onchange="appState.items['${id}'].syncMaxCount = parseInt(this.value)">
+                  <select id="user-sync-count-${id}" class="select-field" style="width:110px; display:inline-block; height:36px; padding:0 8px; border-radius:6px; background:var(--border-soft); color:var(--text); border:1px solid var(--border);" onchange="appState.items['${id}'].syncMaxCount = parseInt(this.value)">
                     <option value="50" ${item.syncMaxCount === 50 ? 'selected' : ''}>最新 50 条</option>
                     <option value="100" ${item.syncMaxCount === 100 ? 'selected' : ''}>最新 100 条</option>
                     <option value="200" ${item.syncMaxCount === 200 ? 'selected' : ''}>最新 200 条</option>
@@ -112,7 +112,7 @@ function updateCard(id) {
                 <div class="fav-sync-header" style="margin-bottom:8px">
                   <span class="fav-sync-phase" style="font-size:13px; font-weight:600;">${escapeHTML(item.syncPhase || '正在同步...')}</span>
                   <span class="fav-sync-counter" style="margin-left:8px; font-size:12px; color:var(--c-text-muted);">已发现 ${item.syncCollected || 0} 条</span>
-                  <button class="btn btn--stop" style="padding:4px 10px; font-size:11px; border-radius:6px; color:white; border:none; cursor:pointer;" onclick="stopUserSync('${escapeHTML(id)}')">停止打断</button>
+                  <button class="btn btn--stop" style="padding:4px 10px; font-size:11px; border-radius:6px; color:var(--text); border:none; cursor:pointer;" onclick="stopUserSync('${escapeHTML(id)}')">停止打断</button>
                 </div>
                 <div class="fav-sync-progress" style="height:4px; background:var(--c-border); border-radius:2px; overflow:hidden; margin-top:8px;">
                   <div class="fav-sync-progress-fill indeterminate" style="width:30%"></div>
@@ -158,11 +158,11 @@ function updateCard(id) {
 
             let headerHtml = `
               <div class="video-card user-sync-card" style="flex-direction:column; align-items:stretch; padding:12px 16px;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:8px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid var(--border-soft); padding-bottom:8px;">
                   <div style="display:flex; align-items:center; gap:8px; min-width:0;">
-                    <div class="author-avatar" style="width:32px; height:32px; border-radius:50%; background:var(--c-primary); display:flex; align-items:center; justify-content:center; font-weight:bold; color:white; font-size:16px; flex-shrink:0;">👤</div>
+                    <div class="author-avatar" style="width:32px; height:32px; border-radius:50%; background:var(--sub); display:flex; align-items:center; justify-content:center; font-weight:bold; color:var(--text); font-size:16px; flex-shrink:0;"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="10" cy="7" r="3"/><path d="M4 17a6 6 0 0 1 12 0"/></svg></div>
                     <div style="min-width:0;">
-                      <h3 style="font-size:14px; font-weight:600; color:white; margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHTML(item.nickname || info.author?.nickname)}">${escapeHTML(item.nickname || info.author?.nickname || '抖音用户')}</h3>
+                      <h3 style="font-size:14px; font-weight:600; color:var(--text); margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHTML(item.nickname || info.author?.nickname)}">${escapeHTML(item.nickname || info.author?.nickname || '抖音用户')}</h3>
                       <p style="font-size:11px; color:var(--c-text-muted); margin:0;">主页${item.syncType === 'like' ? '喜欢' : '作品'}同步 (发现 ${item.userItems.length} 条)</p>
                     </div>
                   </div>
@@ -178,12 +178,12 @@ function updateCard(id) {
                   <div class="multi-select-bar" style="margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; background:rgba(124, 58, 237, 0.15); padding:6px 10px; border-radius:6px;">
                     <span style="font-size:12px; font-weight:600; color:var(--c-primary)">已选 ${item.selectedItems.size} 项</span>
                     <div class="multi-select-actions" style="display:flex; gap:6px; align-items:center;">
-                      <select class="select-field" style="width:90px; height:22px; padding:0 4px; font-size:11px; border-radius:6px; background:rgba(255,255,255,0.08); color:white; border:1px solid rgba(255,255,255,0.15); cursor:pointer;" onchange="if(this.value) { userSelectRecent('${id}', parseInt(this.value)); this.value=''; }">
-                        <option value="" style="background:#1e293b; color:white;">快速勾选...</option>
-                        <option value="10" style="background:#1e293b; color:white;">最近 10 条</option>
-                        <option value="20" style="background:#1e293b; color:white;">最近 20 条</option>
-                        <option value="50" style="background:#1e293b; color:white;">最近 50 条</option>
-                        <option value="100" style="background:#1e293b; color:white;">最近 100 条</option>
+                      <select class="select-field" style="width:90px; height:22px; padding:0 4px; font-size:11px; border-radius:6px; background:var(--surface); color:var(--text); border:1px solid var(--border); cursor:pointer;" onchange="if(this.value) { userSelectRecent('${id}', parseInt(this.value)); this.value=''; }">
+                        <option value="" style="background:#1e293b; color:var(--text);">快速勾选...</option>
+                        <option value="10" style="background:#1e293b; color:var(--text);">最近 10 条</option>
+                        <option value="20" style="background:#1e293b; color:var(--text);">最近 20 条</option>
+                        <option value="50" style="background:#1e293b; color:var(--text);">最近 50 条</option>
+                        <option value="100" style="background:#1e293b; color:var(--text);">最近 100 条</option>
                       </select>
                       <button class="btn btn--secondary" style="padding:3px 8px; font-size:11px; border-radius:6px; height:22px;" onclick="userSelectAllUndownloaded('${id}')">全选未下载</button>
                       <button class="btn btn--secondary" style="padding:3px 8px; font-size:11px; border-radius:6px; height:22px;" onclick="toggleUserMultiSelectMode('${id}')">取消</button>
@@ -197,15 +197,15 @@ function updateCard(id) {
             bodyHtml += `
               <div class="fav-group" style="${item.isMultiSelectMode ? 'opacity:0.9' : ''}">
                 <div class="fav-sync-header" style="margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
-                  <span class="fav-sync-phase" style="font-size:12px; font-weight:600; color:var(--c-text)">📥 未下载 (${undownloaded.length})</span>
+                  <span class="fav-sync-phase" style="font-size:12px; font-weight:600; color:var(--c-text)">未下载 (${undownloaded.length})</span>
                   ${(!item.isMultiSelectMode && item.userItems.length > 0) ? `
                   <div style="display:flex; gap:6px; align-items:center;">
-                    <select class="select-field" style="width:90px; height:22px; padding:0 4px; font-size:11px; border-radius:6px; background:rgba(255,255,255,0.08); color:white; border:1px solid rgba(255,255,255,0.15); cursor:pointer;" onchange="if(this.value) { userSelectRecent('${id}', parseInt(this.value)); this.value=''; }">
-                      <option value="" style="background:#1e293b; color:white;">快速勾选...</option>
-                      <option value="10" style="background:#1e293b; color:white;">最近 10 条</option>
-                      <option value="20" style="background:#1e293b; color:white;">最近 20 条</option>
-                      <option value="50" style="background:#1e293b; color:white;">最近 50 条</option>
-                      <option value="100" style="background:#1e293b; color:white;">最近 100 条</option>
+                    <select class="select-field" style="width:90px; height:22px; padding:0 4px; font-size:11px; border-radius:6px; background:var(--surface); color:var(--text); border:1px solid var(--border); cursor:pointer;" onchange="if(this.value) { userSelectRecent('${id}', parseInt(this.value)); this.value=''; }">
+                      <option value="" style="background:#1e293b; color:var(--text);">快速勾选...</option>
+                      <option value="10" style="background:#1e293b; color:var(--text);">最近 10 条</option>
+                      <option value="20" style="background:#1e293b; color:var(--text);">最近 20 条</option>
+                      <option value="50" style="background:#1e293b; color:var(--text);">最近 50 条</option>
+                      <option value="100" style="background:#1e293b; color:var(--text);">最近 100 条</option>
                     </select>
                     <button class="btn btn--secondary" onclick="toggleUserMultiSelectMode('${id}')" style="padding:3px 8px; font-size:11px; border-radius:6px; height:22px;">多选</button>
                     ${undownloaded.length > 0 ? `<button class="btn btn--sync" onclick="downloadAllUserItems('${id}')" style="padding:3px 8px; font-size:11px; border-radius:6px; height:22px; display:inline-flex; align-items:center; gap:3px;">
@@ -215,9 +215,9 @@ function updateCard(id) {
                 </div>`;
 
             if (undownloaded.length === 0) {
-                bodyHtml += '<div style="padding:10px 0; text-align:center; color:var(--c-text-muted); font-size:11px">🎉 全部已下载</div>';
+                bodyHtml += '<div style="padding:10px 0; text-align:center; color:var(--c-text-muted); font-size:11px">全部已下载</div>';
             } else {
-                bodyHtml += '<div class="fav-sync-items" style="max-height:220px; overflow-y:auto; display:flex; flex-direction:column; gap:4px; border:1px solid rgba(255,255,255,0.05); padding:4px; border-radius:6px; background:rgba(0,0,0,0.1);">';
+                bodyHtml += '<div class="fav-sync-items" style="max-height:220px; overflow-y:auto; display:flex; flex-direction:column; gap:4px; border:1px solid var(--border-soft); padding:4px; border-radius:6px; background:rgba(0,0,0,0.1);">';
                 bodyHtml += undownloaded.map(uItem => renderUserItemCardHTML(id, uItem, false)).join('');
                 bodyHtml += '</div>';
             }
@@ -233,13 +233,13 @@ function updateCard(id) {
                              style="transition:transform 0.2s; transform:rotate(${item.downloadedExpanded ? '90' : '0'}deg)">
                           <polyline points="9 18 15 12 9 6"/>
                         </svg>
-                        ✅ 已下载 (${downloaded.length})
+                        已下载 (${downloaded.length})
                       </span>
                       <span class="fav-sync-counter" style="font-size:10px; color:var(--c-text-muted)">点击${item.downloadedExpanded ? '收起' : '展开'}</span>
                     </div>`;
 
                 if (item.downloadedExpanded) {
-                    bodyHtml += '<div class="fav-sync-items" style="max-height:160px; overflow-y:auto; display:flex; flex-direction:column; gap:4px; border:1px solid rgba(255,255,255,0.05); padding:4px; border-radius:6px; background:rgba(0,0,0,0.1);">';
+                    bodyHtml += '<div class="fav-sync-items" style="max-height:160px; overflow-y:auto; display:flex; flex-direction:column; gap:4px; border:1px solid var(--border-soft); padding:4px; border-radius:6px; background:rgba(0,0,0,0.1);">';
                     bodyHtml += downloaded.map(uItem => renderUserItemCardHTML(id, uItem, true)).join('');
                     bodyHtml += '</div>';
                 }
@@ -313,7 +313,7 @@ function updateCard(id) {
             <div class="progress-bar">
               <div class="progress-fill" style="width: ${pNum}%"></div>
             </div>
-            <div class="progress-detail">${pDetail}</div>
+            <div class="progress-detail">${escapeHTML(pDetail)}</div>
           </div>
         `;
     }
@@ -391,7 +391,7 @@ function renderFavList() {
     // 未下载区域
     html += `<div class="fav-group" style="${isFavMultiSelectMode ? 'opacity:0.9' : ''}">
         <div class="fav-sync-header" style="margin-bottom:10px">
-            <span class="fav-sync-phase">📥 未下载 (${undownloaded.length})</span>
+            <span class="fav-sync-phase">未下载 (${undownloaded.length})</span>
             ${(!isFavMultiSelectMode && favSyncedItems.length > 0) ? `
             <div style="display:flex;gap:8px;">
                 <button class="btn btn--secondary" onclick="toggleFavMultiSelectMode()" style="padding:5px 12px;font-size:12px;border-radius:6px">多选</button>
@@ -405,7 +405,7 @@ function renderFavList() {
         </div>`;
 
     if (undownloaded.length === 0) {
-        html += '<div style="padding:12px 0;text-align:center;color:var(--c-text-muted);font-size:13px">🎉 全部已下载</div>';
+        html += '<div style="padding:12px 0;text-align:center;color:var(--c-text-muted);font-size:13px">全部已下载</div>';
     } else {
         html += '<div class="fav-sync-items">';
         html += undownloaded.map(item => renderFavItemCard(item, false)).join('');
@@ -422,7 +422,7 @@ function renderFavList() {
                           style="transition:transform 0.2s;transform:rotate(${favDownloadedExpanded ? '90' : '0'}deg)">
                         <polyline points="9 18 15 12 9 6"/>
                     </svg>
-                    ✅ 已下载 (${downloaded.length})
+                    已下载 (${downloaded.length})
                 </span>
                 <span class="fav-sync-counter" style="font-size:11px;color:var(--c-text-muted)">点击${favDownloadedExpanded ? '收起' : '展开'}</span>
             </div>`;
@@ -464,7 +464,7 @@ function renderFavItemCard(item, isDownloadedSection) {
         const progress = dState.progress || 0;
         actionHtml = `<div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
             <div style="width:60px;height:4px;background:var(--c-border);border-radius:2px;overflow:hidden">
-                <div style="width:${progress}%;height:100%;background:linear-gradient(90deg,var(--c-primary),var(--c-accent));border-radius:2px;transition:width 0.3s"></div>
+                <div style="width:${progress}%;height:100%;background:var(--c-primary);border-radius:2px;transition:width 0.3s"></div>
             </div>
             <span style="font-size:11px;color:var(--c-primary);font-family:var(--font-mono);white-space:nowrap">${progress}%</span>
         </div>`;
@@ -570,7 +570,7 @@ function renderLikedList() {
 
     html += `<div class="fav-group" style="${isLikedMultiSelectMode ? 'opacity:0.9' : ''}">
         <div class="fav-sync-header" style="margin-bottom:10px">
-            <span class="fav-sync-phase">📥 未下载 (${undownloaded.length})</span>
+            <span class="fav-sync-phase">未下载 (${undownloaded.length})</span>
             ${(!isLikedMultiSelectMode && likedSyncedItems.length > 0) ? `
             <div style="display:flex;gap:8px;">
                 <button class="btn btn--secondary" onclick="toggleLikedMultiSelectMode()" style="padding:5px 12px;font-size:12px;border-radius:6px">多选</button>
@@ -584,7 +584,7 @@ function renderLikedList() {
         </div>`;
 
     if (undownloaded.length === 0) {
-        html += '<div style="padding:12px 0;text-align:center;color:var(--c-text-muted);font-size:13px">🎉 全部已下载</div>';
+        html += '<div style="padding:12px 0;text-align:center;color:var(--c-text-muted);font-size:13px">全部已下载</div>';
     } else {
         html += '<div class="fav-sync-items">';
         html += undownloaded.map(item => renderLikedItemCard(item, false)).join('');
@@ -600,7 +600,7 @@ function renderLikedList() {
                           style="transition:transform 0.2s;transform:rotate(${likedDownloadedExpanded ? '90' : '0'}deg)">
                         <polyline points="9 18 15 12 9 6"/>
                     </svg>
-                    ✅ 已下载 (${downloaded.length})
+                    已下载 (${downloaded.length})
                 </span>
                 <span class="fav-sync-counter" style="font-size:11px;color:var(--c-text-muted)">点击${likedDownloadedExpanded ? '收起' : '展开'}</span>
             </div>`;
@@ -642,7 +642,7 @@ function renderLikedItemCard(item, isDownloadedSection) {
         const progress = dState.progress || 0;
         actionHtml = `<div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
             <div style="width:60px;height:4px;background:var(--c-border);border-radius:2px;overflow:hidden">
-                <div style="width:${progress}%;height:100%;background:linear-gradient(90deg,var(--c-primary),var(--c-accent));border-radius:2px;transition:width 0.3s"></div>
+                <div style="width:${progress}%;height:100%;background:var(--c-primary);border-radius:2px;transition:width 0.3s"></div>
             </div>
             <span style="font-size:11px;color:var(--c-primary);font-family:var(--font-mono);white-space:nowrap">${progress}%</span>
         </div>`;
@@ -747,7 +747,7 @@ function renderMsgList() {
 
     html += `<div class="fav-group" style="${isMsgMultiSelectMode ? 'opacity:0.9' : ''}">
         <div class="fav-sync-header" style="margin-bottom:10px">
-            <span class="fav-sync-phase">📥 未下载 (${undownloaded.length})</span>
+            <span class="fav-sync-phase">未下载 (${undownloaded.length})</span>
             ${(!isMsgMultiSelectMode && msgSyncedItems.length > 0) ? `
             <div style="display:flex;gap:8px;">
                 <button class="btn btn--secondary" onclick="toggleMsgMultiSelectMode()" style="padding:5px 12px;font-size:12px;border-radius:6px">多选</button>
@@ -761,7 +761,7 @@ function renderMsgList() {
         </div>`;
 
     if (undownloaded.length === 0) {
-        html += '<div style="padding:12px 0;text-align:center;color:var(--c-text-muted);font-size:13px">🎉 全部已下载</div>';
+        html += '<div style="padding:12px 0;text-align:center;color:var(--c-text-muted);font-size:13px">全部已下载</div>';
     } else {
         html += '<div class="fav-sync-items">';
         html += undownloaded.map(item => renderMsgItemCard(item, false)).join('');
@@ -777,7 +777,7 @@ function renderMsgList() {
                           style="transition:transform 0.2s;transform:rotate(${msgDownloadedExpanded ? '90' : '0'}deg)">
                         <polyline points="9 18 15 12 9 6"/>
                     </svg>
-                    ✅ 已下载 (${downloaded.length})
+                    已下载 (${downloaded.length})
                 </span>
                 <span class="fav-sync-counter" style="font-size:11px;color:var(--c-text-muted)">点击${msgDownloadedExpanded ? '收起' : '展开'}</span>
             </div>`;
@@ -819,7 +819,7 @@ function renderMsgItemCard(item, isDownloadedSection) {
         const progress = dState.progress || 0;
         actionHtml = `<div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
             <div style="width:60px;height:4px;background:var(--c-border);border-radius:2px;overflow:hidden">
-                <div style="width:${progress}%;height:100%;background:linear-gradient(90deg,var(--c-primary),var(--c-accent));border-radius:2px;transition:width 0.3s"></div>
+                <div style="width:${progress}%;height:100%;background:var(--c-primary);border-radius:2px;transition:width 0.3s"></div>
             </div>
             <span style="font-size:11px;color:var(--c-primary);font-family:var(--font-mono);white-space:nowrap">${progress}%</span>
         </div>`;
@@ -901,7 +901,7 @@ function renderUserItemCardHTML(cardId, uItem, isDownloadedSection) {
         const progress = dState.progress || 0;
         actionHtml = `<div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
             <div style="width:50px;height:4px;background:var(--c-border);border-radius:2px;overflow:hidden">
-                <div style="width:${progress}%;height:100%;background:linear-gradient(90deg,var(--c-primary),var(--c-accent));border-radius:2px;transition:width 0.3s"></div>
+                <div style="width:${progress}%;height:100%;background:var(--c-primary);border-radius:2px;transition:width 0.3s"></div>
             </div>
             <span style="font-size:10px;color:var(--c-primary);font-family:var(--font-mono);white-space:nowrap">${progress}%</span>
         </div>`;
