@@ -120,8 +120,10 @@ router.post('/favorites/sync', async (req, res) => {
                     const awemeId = info.awemeId || '';
                     const isImage = info.type === 'image';
                     const safeName = douyin.sanitizeFilename(info.title || awemeId || 'douyin');
+                    // 与 routes/download.js 的落盘命名保持一致：实况图用 [实况图]_ 前缀，避免已下载检测错位
+                    const isLivePhoto = isImage && Array.isArray(info.livePhotos) && info.livePhotos.length > 0;
                     const fileName = isImage
-                        ? `[图集]_${safeName}`
+                        ? `${isLivePhoto ? '[实况图]_' : '[图集]_'}${safeName}`
                         : `${safeName}_${awemeId || Date.now()}.mp4`;
                     const savePath = path.join(downloadDir, fileName);
                     const alreadyDownloaded = syncedIds.has(awemeId) || fsSync.existsSync(savePath);
@@ -130,6 +132,7 @@ router.post('/favorites/sync', async (req, res) => {
                         type: info.type,
                         videoUrl: info.videoUrl,
                         images: info.images,
+                        livePhotos: info.livePhotos || [],
                         title: info.title,
                         author: info.author,
                         cover: info.cover,
@@ -254,8 +257,10 @@ router.post('/liked/sync', async (req, res) => {
                     const awemeId = info.awemeId || '';
                     const isImage = info.type === 'image';
                     const safeName = douyin.sanitizeFilename(info.title || awemeId || 'douyin');
+                    // 与 routes/download.js 的落盘命名保持一致：实况图用 [实况图]_ 前缀，避免已下载检测错位
+                    const isLivePhoto = isImage && Array.isArray(info.livePhotos) && info.livePhotos.length > 0;
                     const fileName = isImage
-                        ? `[图集]_${safeName}`
+                        ? `${isLivePhoto ? '[实况图]_' : '[图集]_'}${safeName}`
                         : `${safeName}_${awemeId || Date.now()}.mp4`;
                     const savePath = path.join(downloadDir, fileName);
                     const alreadyDownloaded = likedIds.has(awemeId) || fsSync.existsSync(savePath);
@@ -264,6 +269,7 @@ router.post('/liked/sync', async (req, res) => {
                         type: info.type,
                         videoUrl: info.videoUrl,
                         images: info.images,
+                        livePhotos: info.livePhotos || [],
                         title: info.title,
                         author: info.author,
                         cover: info.cover,
@@ -389,8 +395,10 @@ router.post('/messages/sync', async (req, res) => {
                     const awemeId = info.awemeId || '';
                     const isImage = info.type === 'image';
                     const safeName = douyin.sanitizeFilename(info.title || awemeId || 'douyin');
+                    // 与 routes/download.js 的落盘命名保持一致：实况图用 [实况图]_ 前缀，避免已下载检测错位
+                    const isLivePhoto = isImage && Array.isArray(info.livePhotos) && info.livePhotos.length > 0;
                     const fileName = isImage
-                        ? `[图集]_${safeName}`
+                        ? `${isLivePhoto ? '[实况图]_' : '[图集]_'}${safeName}`
                         : `${safeName}_${awemeId || Date.now()}.mp4`;
                     const savePath = path.join(downloadDir, fileName);
                     const alreadyDownloaded = fsSync.existsSync(savePath);
@@ -399,6 +407,7 @@ router.post('/messages/sync', async (req, res) => {
                         type: info.type,
                         videoUrl: info.videoUrl,
                         images: info.images,
+                        livePhotos: info.livePhotos || [],
                         title: info.title,
                         author: info.author,
                         cover: info.cover,
@@ -552,8 +561,10 @@ router.post('/user/sync', async (req, res) => {
                     const awemeId = info.awemeId || '';
                     const isImage = info.type === 'image';
                     const safeName = douyin.sanitizeFilename(info.title || awemeId || 'douyin');
+                    // 与 routes/download.js 的落盘命名保持一致：实况图用 [实况图]_ 前缀，避免已下载检测错位
+                    const isLivePhoto = isImage && Array.isArray(info.livePhotos) && info.livePhotos.length > 0;
                     const fileName = isImage
-                        ? `[图集]_${safeName}`
+                        ? `${isLivePhoto ? '[实况图]_' : '[图集]_'}${safeName}`
                         : `${safeName}_${awemeId || Date.now()}.mp4`;
                     const savePath = path.join(downloadDir, fileName);
                     
@@ -575,6 +586,7 @@ router.post('/user/sync', async (req, res) => {
                         type: info.type,
                         videoUrl: info.videoUrl,
                         images: info.images,
+                        livePhotos: info.livePhotos || [],
                         title: info.title,
                         author: info.author,
                         cover: info.cover,

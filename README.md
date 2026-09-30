@@ -3,7 +3,7 @@
 > 🚀 一个基于 Node.js 构建的现代化、极简、高颜值的全平台视频内容解析及下载工具。
 
 ![UI Preview](https://img.shields.io/badge/Status-Active-success)
-![Version](https://img.shields.io/badge/Version-8.5.0-blue)
+![Version](https://img.shields.io/badge/Version-8.5.1-blue)
 ![Nodejs](https://img.shields.io/badge/Node.js-18.x-blue)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 
@@ -32,6 +32,12 @@
 ## 🆕 相比「新增喜欢功能」之后的详细更新
 
 以下内容为基于 `feat: add douyin liked sync support` 之后的持续迭代，方便老用户快速了解最近新增了什么：
+
+### 🆕 v8.5.1 更新（2026-09-30）
+
+- **修复同步列表下载实况图只存静态图**：收藏 / 喜欢 / 私信 / 用户主页同步的条目组装丢失 `livePhotos` 字段，前端下载时实况动图 MP4 不会被请求。现四处全部透传实况元数据，同步列表下载实况图与链接解析一致（原图 + 实况视频成对落盘，目录使用 `[实况图]_` 前缀）。
+- **修复同步「已下载」检测对实况图失效**：检测文件名写死 `[图集]_` 前缀，与实况图实际落盘的 `[实况图]_` 目录错位；现按条目是否含实况动态选择前缀。
+- 新增实况图透传回归测试，测试套件 13/13 通过。
 
 ### 🆕 v8.5.0 更新（2026-09-30）
 

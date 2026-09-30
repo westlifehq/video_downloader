@@ -166,3 +166,66 @@ test.after(() => {
     process.env.DOWNLOAD_DIR = originalDownloadDir;
   }
 });
+
+test('fav sync route passthrough keeps livePhotos and uses live-photo folder prefix', async () => {
+  const os = require('os');
+  const syncRouter = require('../routes/sync');
+  const favorites = require('../lib/douyin-favorites');
+  const configHelper = require('../lib/config');
+
+  const original = {
+    fetchFavorites: favorites.fetchFavorites,
+    getSyncedData: favorites.getSyncedData,
+    getEffectiveDownloadDir: configHelper.getEffectiveDownloadDir,
+    createTask: taskManager.createTask,
+    updateTask: taskManager.updateTask,
+    getTask: taskManager.getTask,
+    getAllTasks: taskManager.getAllTasks
+  };
+
+  const store = new Map();
+  taskManager.createTask = async (type, id, data) => { store.set(id, { ...data, id }); };
+  taskManager.updateTask = async (type, id, patch) => { Object.assign(store.get(id), patch); };
+  taskManager.getTask = (type, id) => store.get(id);
+  taskManager.getAllTasks = () => [...store.values()];
+  favorites.fetchFavorites = async () => ([{
+    aweme_id: 'livetest001',
+    desc: '实况图回归测试',
+    images: [{
+      url_list: ['https://p3-sign.douyinpic.com/test.jpeg'],
+      video: { playAddr: [{ src: 'https://www.douyin.com/aweme/v1/play/?video_id=livetest' }] }
+    }]
+  }]);
+  favorites.getSyncedData = async () => ({ ids: [] });
+  configHelper.getEffectiveDownloadDir = async () => os.tmpdir();
+
+  try {
+    const layer = syncRouter.stack.find(item => item.route && item.route.path === '/favorites/sync' && item.route.methods.post);
+    const handler = layer.route.stack[0].handle;
+
+    let response = null;
+    await handler({ body: { maxCount: 1 } }, { json(payload) { response = payload; }, status() { return this; } });
+    assert.ok(response && response.taskId, 'sync route should return taskId');
+
+    for (let i = 0; i < 80; i++) {
+      const task = store.get(response.taskId);
+      if (task && task.status === 'done') break;
+      await new Promise(resolve => setTimeout(resolve, 25));
+    }
+    const task = store.get(response.taskId);
+    assert.equal(task.status, 'done');
+    assert.equal(task.items.length, 1);
+    assert.equal(task.items[0].type, 'image');
+    assert.ok(Array.isArray(task.items[0].livePhotos) && task.items[0].livePhotos.length === 1,
+      'livePhotos must survive the sync item mapping');
+    assert.ok(task.items[0].livePhotos[0].videoUrl.includes('video_id=livetest'));
+    assert.ok(task.items[0].fileName.startsWith('[实况图]_'), 'live photo item must use live-photo prefix');
+  } finally {
+    Object.assign(favorites, { fetchFavorites: original.fetchFavorites, getSyncedData: original.getSyncedData });
+    configHelper.getEffectiveDownloadDir = original.getEffectiveDownloadDir;
+    Object.assign(taskManager, {
+      createTask: original.createTask, updateTask: original.updateTask,
+      getTask: original.getTask, getAllTasks: original.getAllTasks
+    });
+  }
+});

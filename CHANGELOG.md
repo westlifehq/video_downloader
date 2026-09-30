@@ -1,3 +1,19 @@
+## [v8.5.1] - 2026-09-30
+
+### Fixed
+- **同步列表下载实况图只存静态图（实况 MP4 丢失）**：`normalizeVideoData` 返回的 `livePhotos` 在 `routes/sync.js` 收藏 / 喜欢 / 私信 / 用户主页四处 items 组装时被丢弃，前端 `item.livePhotos` 恒为空，下载走纯图集分支，配套实况动图 MP4 根本不会请求。四处补齐 `livePhotos` 透传后，同步列表下载实况图与链接解析行为一致（原图 + 实况视频成对落盘）。
+- **同步「已下载」检测与实况图落盘目录错位**：四处已下载检测文件名写死 `[图集]_` 前缀，而实况图实际按 `[实况图]_` 前缀落盘，导致实况作品的目录存在性检测永远不命中；现按 `livePhotos` 有无动态选择前缀，与 `routes/download.js` 命名规则保持一致。
+
+### Verified
+- 新增回归测试：从 `/favorites/sync` 路由注入真实结构的实况图 aweme 数据，断言 items 保留 `livePhotos` 且 `fileName` 使用 `[实况图]_` 前缀；对旧代码该测试失败，修复后通过。测试套件 13/13 通过。
+- 隔离预览回归 ui-check 6/6、preview-check 全流程 PASS；NAS Docker（J4125 / N100）双机重建部署上线验收通过。
+
+### Metadata
+- Branch: `main`
+- Scope: `routes/sync.js`, `tests/security.test.js`, `package.json`, `package-lock.json`, `CHANGELOG.md`, `README.md`
+
+---
+
 ## [v8.5.0] - 2026-09-30
 
 ### Added
