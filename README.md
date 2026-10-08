@@ -3,11 +3,13 @@
 > 🚀 一个基于 Node.js 构建的现代化、极简、高颜值的全平台视频内容解析及下载工具。
 
 ![UI Preview](https://img.shields.io/badge/Status-Active-success)
-![Version](https://img.shields.io/badge/Version-8.5.1-blue)
+![Version](https://img.shields.io/badge/Version-8.5.2-blue)
 ![Nodejs](https://img.shields.io/badge/Node.js-18.x-blue)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 
 ## 🌟 核心特性
+
+- **抖音解析浏览器兜底复用持久化登录态 (v8.5.2)**：策略4 兜底浏览器优先复用账号同步的 `user_data` 持久化 profile（含 `ttwid` / `s_v_web_id` 设备指纹 Cookie，与同步同一套隐身启动参数），profile 被占用时自动回退临时会话；直接访问 `/video/{id}` 规避未登录态 note 页 302 后不发数据的问题，detail 等待窗口延长至 12s 覆盖冷启动。
 
 - **全新浅色渐变界面 (v8.5.0)**：顶部五项导航（链接解析 / 账号同步 / 定时任务 / 下载历史 / 设置）取代侧栏，浅冰蓝/暖杏/浅绿径向渐变背景缓慢交替，透明毛玻璃导航与背景自然融合；删除首页假统计，`sessionid` 密文输入，完整键盘与读屏可访问性适配。
 - **下载历史封面缩略图 (v8.5.0)**：下载任务落库时保存解析所得封面（`cover`）与 `awemeId`，历史页按记录直接渲染视频封面，无需再靠占位图标辨认；存量旧记录继续显示占位图标。
@@ -32,6 +34,15 @@
 ## 🆕 相比「新增喜欢功能」之后的详细更新
 
 以下内容为基于 `feat: add douyin liked sync support` 之后的持续迭代，方便老用户快速了解最近新增了什么：
+
+### 🆕 v8.5.2 更新（2026-10-08）
+
+- **修复抖音链接解析在 Docker/NAS 上全面失败**：抖音 Web API 风控升级（策略1 全网 403 `ArgusSecurityPlugin`）、未登录分享页不再内嵌 `play_addr`（策略2 失效）、策略4 临时浏览器缺设备指纹 Cookie 且 note 页 302 后不发起数据请求，三路全挂导致解析必败。
+- **策略4 浏览器兜底重构**（`lib/douyin.js`）：
+  - 优先复用账号同步的 `user_data` 持久化登录态（含 `ttwid` / `s_v_web_id` 设备指纹，隐身参数与同步一致），profile 被占用（定时同步进行中）时自动回退临时会话 + `sessionid` 注入。
+  - 直接访问 `/video/{id}`，跳过未登录态下不发数据的 note 页。
+  - detail 等待窗口 5s → 12s，覆盖容器重启后的浏览器冷启动。
+- J4125 Docker 实测：抖音短链解析连续 3/3 成功（含冷启动），返回无水印 CDN 视频地址；小红书短链解析正常。
 
 ### 🆕 v8.5.1 更新（2026-09-30）
 

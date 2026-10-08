@@ -1,3 +1,22 @@
+## [v8.5.2] - 2026-10-08
+
+### Fixed
+- **抖音链接解析在 Docker/NAS 上全面失败（策略1/2/4 三路全挂）**：抖音 Web API 近期升级风控，`aweme/v1/web/aweme/detail` 一律返回 403 `Blocked by ArgusSecurityPlugin Uifid Not Found`（策略1 全网失效，与本仓库代码无关）；未登录态下 iesdouyin 分享页 `_ROUTER_DATA` 不再包含 `play_addr`（策略2 失效）；策略4 兜底浏览器原实现为一次性临时 context，仅注入单个 `sessionid`，缺少 `ttwid` / `s_v_web_id` 等设备指纹 Cookie。
+- **策略4 浏览器兜底重构（`lib/douyin.js` `fetchViaPlaywright`）**：
+  - 改为优先 `launchPersistentContext` 复用账号同步的 `user_data` 持久化 profile（与 `lib/douyin-favorites.js` 同一套隐身启动参数：`--disable-blink-features=AutomationControlled`、`ignoreDefaultArgs: ['--enable-automation']`、`locale: zh-CN`），profile 被占用（如定时同步进行中）时自动回退到原临时 context + `douyin_session.json` 注入方案。
+  - 未登录态下 `/note/{id}` 会 302 到 `/video/{id}` 且页面停在"视频数据加载中"、不发起 `aweme/detail` 请求；改为直接访问 `/video/{id}`。
+  - detail 等待窗口 5s → 12s，覆盖容器重启后首次启动浏览器的冷启动场景。
+
+### Verified
+- J4125 飞牛OS Docker（node:20-slim + Chromium 精简底座）实测：抖音分享短链解析连续 3/3 成功（含容器重启后冷启动场景），返回 douyinvod 无水印 CDN 视频地址；小红书短链解析正常。
+- 修复已同步 NAS 构建上下文并重建容器上线。部署排查中发现 NAS 侧 `lib/xhs.js` 曾为 v8.3.4 旧版（与 package.json 8.5.1 不一致，导致小红书解析失败），已同步 Git 最新版解决。
+
+### Metadata
+- Branch: `main`
+- Scope: `lib/douyin.js`, `package.json`, `package-lock.json`, `CHANGELOG.md`, `README.md`
+
+---
+
 ## [v8.5.1] - 2026-09-30
 
 ### Fixed
