@@ -3,7 +3,7 @@
 > 🚀 一个基于 Node.js 构建的现代化、极简、高颜值的全平台视频内容解析及下载工具。
 
 ![UI Preview](https://img.shields.io/badge/Status-Active-success)
-![Version](https://img.shields.io/badge/Version-8.5.2-blue)
+![Version](https://img.shields.io/badge/Version-8.5.3-blue)
 ![Nodejs](https://img.shields.io/badge/Node.js-18.x-blue)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 
@@ -34,6 +34,11 @@
 ## 🆕 相比「新增喜欢功能」之后的详细更新
 
 以下内容为基于 `feat: add douyin liked sync support` 之后的持续迭代，方便老用户快速了解最近新增了什么：
+
+### 🆕 v8.5.3 更新（2026-10-09）
+
+- **修复定时私信同步漏扫会话**：会话列表等待超时仅 10s，headless 冷启动下抖音页面加载慢，导致实际只扫到 1 个会话、其余会话的新分享视频全部漏扫；等待时间放宽至 60s。
+- 实测：放宽等待后会话列表正常加载，扫描会话数增加，无新增报错。
 
 ### 🆕 v8.5.2 更新（2026-10-08）
 

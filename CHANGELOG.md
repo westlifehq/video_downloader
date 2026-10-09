@@ -1,3 +1,19 @@
+## [v8.5.3] - 2026-10-09
+
+### Fixed
+- **定时私信同步漏扫会话（新私信视频未下载）**：`fetchMessageVideos` 打开 `chat?isPopup=1` 后等待会话列表的选择器超时仅 10s，headless 冷启动下抖音页面加载慢，超时后直接继续扫描，实际只捕获 1 个会话，其余会话中的新分享视频全部漏扫（2026-10-09 00:56 定时任务实测：等待超时 → 发现 1 个会话 → 11 个视频引用全为已下载旧内容，toDownload=0）。
+- **修复**：`lib/douyin-favorites.js` 会话列表等待 10s → 60s（超时提示语同步更新），其余扫描逻辑不变。
+
+### Verified
+- J4125 Docker 手动触发私信同步实测：会话列表在放宽等待后正常加载，扫描会话数较此前增加，无新增报错。
+- 抖音链接解析（策略4）回归正常：短链解析连续成功，小红书短链解析正常。
+
+### Metadata
+- Branch: `main`
+- Scope: `lib/douyin-favorites.js`, `package.json`, `package-lock.json`, `CHANGELOG.md`, `README.md`
+
+---
+
 ## [v8.5.2] - 2026-10-08
 
 ### Fixed
