@@ -3,7 +3,7 @@
 > 🚀 一个基于 Node.js 构建的现代化、极简、高颜值的全平台视频内容解析及下载工具。
 
 ![UI Preview](https://img.shields.io/badge/Status-Active-success)
-![Version](https://img.shields.io/badge/Version-8.5.3-blue)
+![Version](https://img.shields.io/badge/Version-8.5.4-blue)
 ![Nodejs](https://img.shields.io/badge/Node.js-18.x-blue)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 
@@ -34,6 +34,10 @@
 ## 🆕 相比「新增喜欢功能」之后的详细更新
 
 以下内容为基于 `feat: add douyin liked sync support` 之后的持续迭代，方便老用户快速了解最近新增了什么：
+
+### 🆕 v8.5.4 更新（2026-10-09）
+
+- **修复私信同步只扫到 1 个会话**：抖音调整私信页 class 混淆后主选择器仅命中 1 个元素，原"首选择器命中即采用"逻辑导致其余会话漏扫；改为遍历多个候选选择器取命中最多的一组。实测扫描会话数 1 → 10。
 
 ### 🆕 v8.5.3 更新（2026-10-09）
 
