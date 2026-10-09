@@ -1,3 +1,19 @@
+## [v8.5.4] - 2026-10-09
+
+### Fixed
+- **定时私信同步只扫到 1 个会话（选择器失效导致漏扫）**：抖音再次调整私信页 class 混淆，主选择器 `div[class*="conversationConversationItemwrapper"]` 实测仅命中 1 个元素，而宽泛选择器 `[class*="ConversationItem"]` 命中 13 个；原实现为"前一选择器命中即采用"，1 个命中直接通过，不再尝试后续选择器，导致其余会话全部漏扫（与 v8.5.3 的等待时长问题叠加，此前"发现 1 个会话"实为两个原因共同作用）。
+- **修复**：`lib/douyin-favorites.js` 会话项获取改为遍历 6 个候选选择器、取命中数最多的一组，并输出命中选择器日志便于后续排查；扫描循环内的重查沿用该选择器。
+
+### Verified
+- J4125 Docker 实测（2026-10-09，会话列表 DOM dump）：登录态正常，`[class*="ConversationItem"]` 命中 13 个会话项；采用最优选择器策略后扫描会话数由 1 恢复至两位数。
+- 手动触发私信同步回归通过：解析、去重、已下载过滤均正常。
+
+### Metadata
+- Branch: `main`
+- Scope: `lib/douyin-favorites.js`, `package.json`, `package-lock.json`, `CHANGELOG.md`, `README.md`
+
+---
+
 ## [v8.5.3] - 2026-10-09
 
 ### Fixed
