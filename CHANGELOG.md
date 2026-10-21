@@ -1,3 +1,19 @@
+## [v8.5.7] - 2026-10-22
+
+### Fixed
+- **定时同步偶发失败无重试（2026-10-22 04:09 整个凌晨任务作废）**：私信阶段打开 chat 页 `page.goto` 30s 超时（14 天来首次偶发网络抖动），调度器无重试机制，一次失败即放弃当次同步。
+- **修复**：① `lib/douyin-favorites.js` chat 页 goto 超时 30s → 60s；② `lib/scheduler-service.js` 同步阶段增加重试（最多 3 次尝试、间隔 3 分钟），失败时浏览器由既有 finally 清理，重试安全；日志记录重试过程。
+
+### Verified
+- 近 14 天调度日志复盘：每日触发正常（totalFound 88~121，wheel 深挖生效），本次为唯一 goto 超时失败。
+- 语法检查通过；失败路径 finally 清理确认（context.close + activeBrowser 置空），重试无浏览器泄漏。
+
+### Metadata
+- Branch: `main`
+- Scope: `lib/scheduler-service.js`, `lib/douyin-favorites.js`, `package.json`, `package-lock.json`, `CHANGELOG.md`, `README.md`
+
+---
+
 ## [v8.5.6] - 2026-10-09
 
 ### Fixed
