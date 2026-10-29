@@ -99,7 +99,12 @@ router.post('/schedule/config', async (req, res) => {
         cfg.rangeEnd = rangeEnd;
     }
     
-    await configHelper.writeScheduleConfig(cfg);
+    try {
+        await configHelper.writeScheduleConfig(cfg);
+    } catch (err) {
+        console.error(`[定时同步] 配置保存失败: ${err.message}`);
+        return res.status(500).json({ error: '定时配置保存失败' });
+    }
     schedulerService.startScheduledTask();
     res.json({ success: true, config: cfg });
 });

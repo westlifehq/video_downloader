@@ -249,7 +249,7 @@ function updateCard(id) {
             if (errored.length > 0) {
                 bodyHtml += '<div style="margin-top:8px; display:flex; flex-direction:column; gap:4px;">';
                 bodyHtml += errored.map(uItem => `<div class="fav-sync-item" style="opacity:0.5; padding:4px 8px; font-size:11px; color:var(--c-error)">
-                    <span class="fav-sync-item-title">${uItem.title} (解析失败: ${uItem.parseError})</span>
+                    <span class="fav-sync-item-title">${escapeHTML(uItem.title)} (解析失败: ${escapeHTML(uItem.parseError)})</span>
                 </div>`).join('');
                 bodyHtml += '</div>';
             }
@@ -794,7 +794,7 @@ function renderMsgList() {
         html += '<div style="margin-top:12px">';
         html += errored.map(item => `<div class="fav-sync-item" style="opacity:0.5;padding:6px 12px">
             <svg class="fav-sync-item-status error" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            <span class="fav-sync-item-title">${item.title} (解析失败)</span>
+            <span class="fav-sync-item-title">${escapeHTML(item.title)} (解析失败)</span>
         </div>`).join('');
         html += '</div>';
     }

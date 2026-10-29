@@ -28,39 +28,43 @@ router.post('/download', async (req, res) => {
 
     console.log(`[下载] 收到请求: ${title}, 平台: ${platform || '未知'}, 类型: ${type}, 子文件夹: ${subDir || '无'}`);
 
-    let downloadDir = await configHelper.getEffectiveDownloadDir();
-    if (subDir) {
-        const safeSubDir = douyin.sanitizeFilename(subDir);
-        downloadDir = path.join(downloadDir, safeSubDir);
+    // Express 4 不捕获 async 异常：建目录/落库失败时若不兜底，请求会一直挂起
+    let fileName, savePath, taskId;
+    try {
+        let downloadDir = await configHelper.getEffectiveDownloadDir();
+        if (subDir) {
+            const safeSubDir = douyin.sanitizeFilename(subDir);
+            downloadDir = path.join(downloadDir, safeSubDir);
+        }
+
+        // 确保下载目录存在
+        if (!fsSync.existsSync(downloadDir)) {
+            const fs = require('fs').promises;
+            await fs.mkdir(downloadDir, { recursive: true });
+        }
+
+        // 生成文件名或目录名
+        fileName = douyin.buildDownloadName({ type, title, awemeId, livePhotos });
+        savePath = path.join(downloadDir, fileName);
+
+        taskId = uuidv4();
+        await taskManager.createTask('download', taskId, {
+            status: 'downloading',
+            progress: 0,
+            downloaded: 0,
+            total: 0,
+            filePath: savePath,
+            fileName,
+            title,
+            // 封面与 awemeId 落库，供下载历史页渲染缩略图（旧记录无此字段，前端已有占位兜底）
+            cover: typeof cover === 'string' ? cover : '',
+            awemeId: awemeId || '',
+            error: null
+        });
+    } catch (err) {
+        console.error(`[下载] 任务创建失败: ${err.message}`);
+        return res.status(500).json({ error: '下载任务创建失败，请检查下载目录' });
     }
-
-    // 确保下载目录存在
-    if (!fsSync.existsSync(downloadDir)) {
-        const fs = require('fs').promises;
-        await fs.mkdir(downloadDir, { recursive: true });
-    }
-
-    // 生成文件名或目录名
-    const safeName = douyin.sanitizeFilename(title || awemeId || 'douyin');
-    const isLivePhoto = isImage && Array.isArray(livePhotos) && livePhotos.length > 0;
-    const folderPrefix = isLivePhoto ? '[实况图]_' : '[图集]_';
-    const fileName = isImage ? `${folderPrefix}${safeName}` : `${safeName}_${awemeId || Date.now()}.mp4`;
-    const savePath = path.join(downloadDir, fileName);
-
-    const taskId = uuidv4();
-    await taskManager.createTask('download', taskId, {
-        status: 'downloading',
-        progress: 0,
-        downloaded: 0,
-        total: 0,
-        filePath: savePath,
-        fileName,
-        title,
-        // 封面与 awemeId 落库，供下载历史页渲染缩略图（旧记录无此字段，前端已有占位兜底）
-        cover: typeof cover === 'string' ? cover : '',
-        awemeId: awemeId || '',
-        error: null
-    });
 
     res.json({ success: true, taskId });
 

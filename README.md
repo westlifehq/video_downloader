@@ -3,7 +3,7 @@
 > 🚀 一个基于 Node.js 构建的现代化、极简、高颜值的全平台视频内容解析及下载工具。
 
 ![UI Preview](https://img.shields.io/badge/Status-Active-success)
-![Version](https://img.shields.io/badge/Version-8.6.0-blue)
+![Version](https://img.shields.io/badge/Version-8.6.1-blue)
 ![Nodejs](https://img.shields.io/badge/Node.js-18.x-blue)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 
@@ -35,6 +35,11 @@
 ## 🆕 相比「新增喜欢功能」之后的详细更新
 
 以下内容为基于 `feat: add douyin liked sync support` 之后的持续迭代，方便老用户快速了解最近新增了什么：
+
+### 🆕 v8.6.1 更新（2026-10-29）
+
+- **图集目录名带作品 ID**（`[图集]_标题_ID`）：修复无文案/同标题图集互相覆盖、定时同步永久跳过。
+- **安全与稳定性**：同步列表标题 XSS 转义；退出登录不再清空下载历史；各类同步共用浏览器 profile 时排队执行；随机定时窗口支持跨午夜；视频下载校验完整性；私信同步兜底路径也取最高画质。
 
 ### 🆕 v8.6.0 更新（2026-10-29）
 

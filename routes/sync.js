@@ -118,13 +118,7 @@ router.post('/favorites/sync', async (req, res) => {
                 try {
                     const info = douyin.normalizeVideoData(rawItem);
                     const awemeId = info.awemeId || '';
-                    const isImage = info.type === 'image';
-                    const safeName = douyin.sanitizeFilename(info.title || awemeId || 'douyin');
-                    // 与 routes/download.js 的落盘命名保持一致：实况图用 [实况图]_ 前缀，避免已下载检测错位
-                    const isLivePhoto = isImage && Array.isArray(info.livePhotos) && info.livePhotos.length > 0;
-                    const fileName = isImage
-                        ? `${isLivePhoto ? '[实况图]_' : '[图集]_'}${safeName}`
-                        : `${safeName}_${awemeId || Date.now()}.mp4`;
+                    const fileName = douyin.buildDownloadName(info);
                     const savePath = path.join(downloadDir, fileName);
                     const alreadyDownloaded = syncedIds.has(awemeId) || fsSync.existsSync(savePath);
 
@@ -255,13 +249,7 @@ router.post('/liked/sync', async (req, res) => {
                 try {
                     const info = douyin.normalizeVideoData(rawItem);
                     const awemeId = info.awemeId || '';
-                    const isImage = info.type === 'image';
-                    const safeName = douyin.sanitizeFilename(info.title || awemeId || 'douyin');
-                    // 与 routes/download.js 的落盘命名保持一致：实况图用 [实况图]_ 前缀，避免已下载检测错位
-                    const isLivePhoto = isImage && Array.isArray(info.livePhotos) && info.livePhotos.length > 0;
-                    const fileName = isImage
-                        ? `${isLivePhoto ? '[实况图]_' : '[图集]_'}${safeName}`
-                        : `${safeName}_${awemeId || Date.now()}.mp4`;
+                    const fileName = douyin.buildDownloadName(info);
                     const savePath = path.join(downloadDir, fileName);
                     const alreadyDownloaded = likedIds.has(awemeId) || fsSync.existsSync(savePath);
 
@@ -388,20 +376,19 @@ router.post('/messages/sync', async (req, res) => {
 
             const downloadDir = await configHelper.getEffectiveDownloadDir();
             const items = [];
+            // 图集目录名带 awemeId 后旧目录名对不上，已下载检测以 ID 记录为准
+            const downloadedIds = new Set([
+                ...((await favorites.getSyncedData()).ids || []),
+                ...((await favorites.getLikedData()).ids || []),
+            ]);
 
             for (const rawItem of rawItems) {
                 try {
                     const info = rawItem;
                     const awemeId = info.awemeId || '';
-                    const isImage = info.type === 'image';
-                    const safeName = douyin.sanitizeFilename(info.title || awemeId || 'douyin');
-                    // 与 routes/download.js 的落盘命名保持一致：实况图用 [实况图]_ 前缀，避免已下载检测错位
-                    const isLivePhoto = isImage && Array.isArray(info.livePhotos) && info.livePhotos.length > 0;
-                    const fileName = isImage
-                        ? `${isLivePhoto ? '[实况图]_' : '[图集]_'}${safeName}`
-                        : `${safeName}_${awemeId || Date.now()}.mp4`;
+                    const fileName = douyin.buildDownloadName(info);
                     const savePath = path.join(downloadDir, fileName);
-                    const alreadyDownloaded = fsSync.existsSync(savePath);
+                    const alreadyDownloaded = downloadedIds.has(awemeId) || fsSync.existsSync(savePath);
 
                     items.push({
                         type: info.type,
@@ -559,13 +546,8 @@ router.post('/user/sync', async (req, res) => {
                 try {
                     const info = douyin.normalizeVideoData(rawItem);
                     const awemeId = info.awemeId || '';
-                    const isImage = info.type === 'image';
-                    const safeName = douyin.sanitizeFilename(info.title || awemeId || 'douyin');
-                    // 与 routes/download.js 的落盘命名保持一致：实况图用 [实况图]_ 前缀，避免已下载检测错位
-                    const isLivePhoto = isImage && Array.isArray(info.livePhotos) && info.livePhotos.length > 0;
-                    const fileName = isImage
-                        ? `${isLivePhoto ? '[实况图]_' : '[图集]_'}${safeName}`
-                        : `${safeName}_${awemeId || Date.now()}.mp4`;
+                    const fileName = douyin.buildDownloadName(info);
+                    const legacyName = douyin.buildDownloadName(info, { legacy: true });
                     const savePath = path.join(downloadDir, fileName);
                     
                     // 判断是否已下载：只检查当前用户历史批量下载目录
@@ -575,7 +557,8 @@ router.post('/user/sync', async (req, res) => {
                         const dirs = fsSync.readdirSync(downloadDir, { withFileTypes: true });
                         for (const d of dirs) {
                             if (!d.isDirectory() || !d.name.startsWith(nickname)) continue;
-                            if (fsSync.existsSync(path.join(downloadDir, d.name, fileName))) {
+                            if (fsSync.existsSync(path.join(downloadDir, d.name, fileName))
+                                || fsSync.existsSync(path.join(downloadDir, d.name, legacyName))) {
                                 alreadyDownloaded = true;
                                 break;
                             }

@@ -1,3 +1,30 @@
+## [v8.6.1] - 2026-10-29
+
+### Fixed
+- **同标题图集/实况图互相覆盖、定时同步永久跳过**：视频文件名带 awemeId，图集目录却只用标题（`[图集]_标题`）。无文案作品（"未知标题"）很常见（下载目录里 16 个 `未知标题_*.mp4`，但 `[图集]_未知标题` / `[实况图]_未知标题` 各仅 1 个目录），后来的同名图集要么覆盖前者的 `01.jpg`，要么被定时同步的"目录已存在"判断跳过且不记 ID、每晚重复跳过。现在图集目录为 `[图集]_标题_awemeId`；命名收敛为 `douyin.buildDownloadName()` 单一来源（原先在下载 / 定时任务 / 4 个同步列表共 6 处重复）。私信同步的已下载判断补充 ID 记录，用户主页同步兼容旧目录名。
+- **存储型 XSS**：同步列表"解析失败"条目直接拼接作品文案（`rawItem.desc`，创作者可控）到 innerHTML（`render.js` 两处），现已转义。
+- **退出登录清空下载历史**：退出登录会 `rm -rf user_data`，而下载历史 `tasks_history.json` 与诊断截图也在其中。现在只清浏览器 profile，保留 `tasks_history.json` 与 `debug/`。
+- **私信同步兜底路径仍为 720p**：未命中 detail 缓存的私信视频经分享页解析，拿到 `ratio=720p` 地址。`ratio=default` 改写下沉到 `normalizeVideoData`，所有分享页来源统一取最高档。
+
+### Changed
+- **同步任务共用 profile 排队**：收藏 / 喜欢 / 私信 / 用户主页 / 定时同步原先只在同类型内防重复，不同类型可同时抢同一个 `user_data` profile；现在统一排队执行。
+- **随机定时窗口支持跨午夜**（如 23:00-02:00，原实现永不触发）；每日在窗口起点安排随机时刻，计算逻辑抽为纯函数 `computeRandomDelay` 并加单测。
+- **视频下载完整性校验**：实际字节数小于 `content-length` 时判失败并删除残缺文件。
+- 定时同步下载失败记录 awemeId / 标题 / 原因；`/api/download` 与定时配置保存的异步异常不再让请求挂起。
+- 前端脚本缓存版本号更新为 `20261029`。
+
+### Verified
+- `node --test` 18/18 通过（新增 `tests/download-naming.test.js` 5 项：命名、旧名兼容、ratio 改写、同日窗口、跨午夜窗口）。
+- 退出登录在隔离目录用假 profile 实测：profile 清除，`tasks_history.json`、`debug/` 保留，会话文件删除。
+- 生产实测：视频解析 10/10 成功 0.66~1.23s；实况图图文解析 + 下载落盘为 `[实况图]_ootdddddd_7641514580350647898`（3 图 2 live）；页面加载新版脚本。
+- 未实测：私信同步整链路（单次约 4 分钟且占用生产 profile，由 `normalizeVideoData` 单测覆盖）。
+
+### Metadata
+- Branch: `main`
+- Scope: `lib/douyin.js`, `lib/douyin-favorites.js`, `lib/scheduler-service.js`, `routes/sync.js`, `routes/download.js`, `routes/config.js`, `public/js/render.js`, `public/index.html`, `tests/download-naming.test.js`, `package.json`, `package-lock.json`, `CHANGELOG.md`, `README.md`
+
+---
+
 ## [v8.6.0] - 2026-10-29
 
 ### Changed
