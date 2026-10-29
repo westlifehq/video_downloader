@@ -98,6 +98,9 @@ router.post('/parse', async (req, res) => {
         });
     } catch (err) {
         console.error(`[解析] 失败: ${err.message}`);
+        if (err.unavailable) {
+            return res.status(404).json({ error: '作品已删除或仅作者可见，无法解析' });
+        }
         res.status(500).json({ error: '解析失败，请检查链接是否正确' });
     }
 });

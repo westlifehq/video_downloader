@@ -3,12 +3,13 @@
 > 🚀 一个基于 Node.js 构建的现代化、极简、高颜值的全平台视频内容解析及下载工具。
 
 ![UI Preview](https://img.shields.io/badge/Status-Active-success)
-![Version](https://img.shields.io/badge/Version-8.5.7-blue)
+![Version](https://img.shields.io/badge/Version-8.6.0-blue)
 ![Nodejs](https://img.shields.io/badge/Node.js-18.x-blue)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 
 ## 🌟 核心特性
 
+- **抖音视频亚秒级解析 (v8.6.0)**：2026-09 风控升级后 Web API 需 `a_bogus` 签名而失效；实测分享页携带匿名 `ttwid` 即恢复 `play_addr`，视频解析由浏览器兜底 10~13s 降至 ~0.8s，且取 `ratio=default` 最高档画质（≥ 原浏览器通道）。图文为保留实况图仍走浏览器；已删除/仅作者可见作品秒级提示。
 - **抖音解析浏览器兜底复用持久化登录态 (v8.5.2)**：策略4 兜底浏览器优先复用账号同步的 `user_data` 持久化 profile（含 `ttwid` / `s_v_web_id` 设备指纹 Cookie，与同步同一套隐身启动参数），profile 被占用时自动回退临时会话；直接访问 `/video/{id}` 规避未登录态 note 页 302 后不发数据的问题，detail 等待窗口延长至 12s 覆盖冷启动。
 
 - **全新浅色渐变界面 (v8.5.0)**：顶部五项导航（链接解析 / 账号同步 / 定时任务 / 下载历史 / 设置）取代侧栏，浅冰蓝/暖杏/浅绿径向渐变背景缓慢交替，透明毛玻璃导航与背景自然融合；删除首页假统计，`sessionid` 密文输入，完整键盘与读屏可访问性适配。
@@ -34,6 +35,12 @@
 ## 🆕 相比「新增喜欢功能」之后的详细更新
 
 以下内容为基于 `feat: add douyin liked sync support` 之后的持续迭代，方便老用户快速了解最近新增了什么：
+
+### 🆕 v8.6.0 更新（2026-10-29）
+
+- **抖音视频解析 ~0.8s**：分享页 + 匿名 `ttwid` 作为首选通道（免登录、不占用账号 profile），实测 20/20 成功；画质取最高档（例：1440p H.265 15.2Mbps）。
+- **偶发解析失败治理**：短链跳转加 5s 超时 + 重试（原无超时，实测偶发卡 48s）；粘贴自动解析与回车/点击重复提交去重；浏览器兜底全局串行 + 失败重试 + 诊断截图。
+- **已删除 / 仅作者可见作品**直接提示原因，不再白等 40s。
 
 ### 🆕 v8.5.7 更新（2026-10-22）
 

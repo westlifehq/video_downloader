@@ -159,6 +159,10 @@ async function handleParse() {
         return;
     }
 
+    // 粘贴会自动触发解析，紧接着回车/点击按钮会对同一内容重复提交，进行中则忽略
+    if (appState.parsingText === text) return;
+    appState.parsingText = text;
+
     const btn = document.getElementById('parseBtn');
     setLoading(btn, true);
     hideError();
@@ -181,9 +185,9 @@ async function handleParse() {
     // 平滑滚动到解析区域，展示“解析中...”动画
     if (container) container.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-    urls.forEach((url, i) => {
+    const requests = urls.map((url, i) => {
         const id = Object.keys(appState.items)[i];
-        api('POST', '/api/parse', { url })
+        return api('POST', '/api/parse', { url })
             .then(res => {
                 appState.items[id] = { ...appState.items[id], loading: false, info: res.data };
                 updateCard(id);
@@ -194,6 +198,8 @@ async function handleParse() {
             });
     });
 
+    await Promise.allSettled(requests);
+    if (appState.parsingText === text) appState.parsingText = null;
     setLoading(btn, false);
 }
 

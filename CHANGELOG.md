@@ -1,3 +1,33 @@
+## [v8.6.0] - 2026-10-29
+
+### Changed
+- **抖音视频解析恢复亚秒级通道（~0.8s，原浏览器兜底 10~13s）**：风控调研实测，iesdouyin 分享页不带 Cookie 时 `_ROUTER_DATA` 不含 `play_addr`，但只需携带一个**匿名注册的 `ttwid`**（`ttwid.bytedance.com` 注册，无需登录）即恢复；`sessionid` / `UIFID` 等登录态 Cookie 均无影响，且必须用移动端 UA。分享页改为首选策略，请求不使用账号 profile，零封号风险。
+- **画质不降反升**：分享页 `play_addr` 默认 `ratio=720p` 且无 `bit_rate` 列表，改为 `ratio=default` 取最高档。5 个样本实测均 ≥ 浏览器 detail 的最高 `bit_rate` 档（例：游泳ootd 浏览器 1440p H.265 4.9Mbps → 1440p H.265 15.2Mbps；另一条 720p 两者字节级一致）；`ratio=1080p` 反而可能只给 576p，故不用。
+- **分享页路径改为 `/share/note/{id}`**：视频与图文 ID 均可返回数据（`/share/video/` 对图文返回空 `item_list`）。
+- **图文仍走浏览器**：分享页图文为精简结构，实测会丢失实况图（Live Photo）动态视频（同一条图文浏览器拿到 2 段 live、分享页 0 段），因此图文优先浏览器获取完整数据，浏览器失败时回退分享页静态图。
+- **策略重排**：① 分享页 + ttwid → ② Web API → ③ 浏览器兜底；原 douyin.com PC 页面抓取移除（实测 SSR `RENDER_DATA` 已不含播放地址，且该函数无数据时 `return null` 不抛错，因此日志从无痕迹）。
+
+### Fixed
+- **短链跳转无超时导致偶发卡死 48s**：`resolveShareUrl` 的 axios 请求原无 `timeout`，实测 v.douyin.com 跳转偶发卡住 48s；加 5s 超时并重试一次（实测超时后重试 0.35s 完成）。
+- **同一链接并发重复解析**：前端粘贴后 100ms 自动解析，再按回车/点按钮会对同一内容重复提交（日志 10-29 05:55 两请求间隔 0.4s、双双失败，两个持久化浏览器同时占用 `user_data`）。前端对进行中的同一输入去重、按钮在解析完成前保持禁用；后端同一视频 ID 并发请求共享同一个 Promise；浏览器兜底全局串行。
+- **浏览器兜底偶发失败**：增加内部重试（共 2 次），detail 等待窗口 12s → 15s（实测 detail 在 goto 后约 6s 到达，冷启动 ~10s）；分阶段日志（启动 / goto 耗时 / detail 到达时间与状态码 / 持久化或临时会话），失败时输出最终 URL、title、验证码元素计数，并截图到 `user_data/debug/parse_fail.png`。
+- **已删除 / 仅作者可见作品快速报错**：分享页 `filter_reason` 含 `deleted` / `self_see` 时直接返回 404「作品已删除或仅作者可见」，不再白跑两轮浏览器（原 ~44s 后报"解析失败"）。
+
+### Investigated（不可行，保留结论）
+- **Web API 直连（`aweme/v1/web/aweme/detail`）**：`uifid` 即 `UIFID` Cookie（320 字符，浏览器放在 query 参数里）。补上后报错由 `Uifid Not Found` 变为 `Signature Not Found`，下一道关卡是 `a_bogus` 签名（webmssdk 生成）；浏览器已签名 URL 原样重放返回 200 空 body（签名一次性）。没有 `a_bogus` 生成器的话，axios 直连不可行，策略保留仅作低成本探测。
+
+### Verified
+- J4125 Docker 生产实测，测试链接 `v.douyin.com/6fHohJZzfgA`：优化前（v8.5.7）连续 10 次 10/10 成功，10.3~13.3s（均值 ~11.5s）；优化后连续 20 次 20/20 成功，0.69~1.07s（含一次短链超时重试 9.1s，该次在 5s 超时下约 5.5s）；另一视频链接 5/5 成功 0.72~1.01s；并发两请求 1.2s / 1.6s 均成功。
+- 端到端下载：2560×1440 H.265 16.25MB（原浏览器通道 5.27MB）。
+- 实况图图文：浏览器通道 14s，3 图 2 live；已删除作品 0.49s 返回 404。
+- `node --test` 13/13 通过。
+
+### Metadata
+- Branch: `main`
+- Scope: `lib/douyin.js`, `routes/parse.js`, `public/js/app.js`, `package.json`, `package-lock.json`, `CHANGELOG.md`, `README.md`
+
+---
+
 ## [v8.5.7] - 2026-10-22
 
 ### Fixed
