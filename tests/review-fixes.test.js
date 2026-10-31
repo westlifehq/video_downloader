@@ -172,6 +172,31 @@ test('scheduler retries failed downloads and does not skip a partial image folde
   scheduler.__setRetryDelayForTest(3 * 60 * 1000);
 });
 
+test('xhs falls back to mobile UA without PC Accept header and reads mobile page state', async (t) => {
+  const xhs = require('../lib/xhs');
+  const state = { noteData: { data: { noteData: {
+    type: 'video', title: 'mobile title', user: { nickName: 'author' },
+    video: { media: { stream: { h264: [{ masterUrl: 'http://sns-video.xhscdn.com/v.mp4' }] } } },
+  } } } };
+  const seen = [];
+  t.mock.method(axios, 'get', async (url, opts) => {
+    seen.push(opts.headers);
+    const mobile = /iPhone/.test(opts.headers['User-Agent']);
+    return {
+      status: 200,
+      request: { res: { responseUrl: mobile
+        ? 'https://www.xiaohongshu.com/discovery/item/abc123?x=1'
+        : 'https://www.xiaohongshu.com/explore?x=1' } },
+      data: mobile ? `<script>window.__INITIAL_STATE__=${JSON.stringify(state)}</script>` : '<html></html>',
+    };
+  });
+  const info = await xhs.fetchXhsInfo('https://xhslink.cn/o/x');
+  assert.equal(info.title, 'mobile title');
+  assert.equal(info.author, 'author');
+  assert.equal(info.videoUrl, 'https://sns-video.xhscdn.com/v.mp4');
+  assert.equal(seen[1].Accept, undefined);
+});
+
 test.after(() => {
   fs.rmSync(tmpRoot, { recursive: true, force: true });
 });
