@@ -23,6 +23,13 @@
 - **运行环境明确为 Node.js ≥ 20**：增加 `engines`，同步 README 和 Windows 脚本；`pkg` 打包目标仍是 Node 18，产物未验证。
 - macOS 启动脚本只结束本项目旧实例，不再 `kill -9` 占用端口的其他程序。
 
+### Verified
+- `node --test` 29/29 通过（Node 20.20.2，与生产同版本）。
+- 生产镜像实测：视频解析 10/10，稳定在 0.68~0.86s（容器刚启动后首次 4.5s）；实况图 3 图 2 live；小红书解析与下载地址正常；已删除作品 404；路径穿越请求返回 400。
+- 下载 → 历史 → 删除全流程：作者和完成时间已保存，删除后文件、历史记录、已下载 ID 均清除，无 `.part` 残留。
+- 完整定时同步：扫描 109 条，补回 2026-10-31 失败的 3 条（3/3 成功）。
+- 未覆盖：小红书图文的移动端页面、登录流程（需扫码）、退出登录抢占运行中的同步。
+
 ### Metadata
 - Branch: `main`
 - Scope: `lib/`, `routes/`, `public/`, `tests/review-fixes.test.js`, 启动脚本, `package.json`, `package-lock.json`, `CHANGELOG.md`, `README.md`
