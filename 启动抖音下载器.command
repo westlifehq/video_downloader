@@ -5,13 +5,23 @@ echo "正在启动抖音视频下载器..."
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$DIR"
 
-# 检查 3000 端口是否被占用，如果是，先杀掉占用进程
+# 检查 3000 端口：只结束本项目自己的旧实例（node server.js 且工作目录为本目录），
+# 其他程序占用时提示退出，不再无差别 kill -9（会误杀别的服务，也让旧实例来不及保存状态）
 PORT=3000
-PID=$(lsof -ti:$PORT)
-if [ ! -z "$PID" ]; then
-    echo "清理被占用的 $PORT 端口 (PID: $PID)..."
-    kill -9 $PID
-fi
+for PID in $(lsof -ti:$PORT -sTCP:LISTEN); do
+    CMD=$(ps -o command= -p "$PID")
+    CWD=$(lsof -a -p "$PID" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p')
+    if [[ "$CMD" == *"server.js"* && "$CWD" == "$DIR" ]]; then
+        echo "结束本项目的旧实例 (PID: $PID)..."
+        kill "$PID"
+        for i in 1 2 3 4 5; do kill -0 "$PID" 2>/dev/null || break; sleep 1; done
+    else
+        echo "⚠️  $PORT 端口被其他程序占用 (PID: $PID, $CMD)"
+        echo "请先关闭该程序，或用 PORT=其他端口 node server.js 启动。"
+        read -n 1 -s -r -p "按任意键退出..."
+        exit 1
+    fi
+done
 
 # 启动 Node 服务并在后台运行
 node server.js &

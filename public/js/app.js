@@ -220,6 +220,7 @@ async function handleDownload(id) {
             livePhotos: item.info.livePhotos,
             cover: item.info.cover,
             title: item.info.title,
+            author: item.info.author,
             awemeId: item.info.awemeId,
             platform: item.info.platform || 'douyin',
         };
@@ -337,12 +338,14 @@ async function loadHistory() {
     const dateFilter = dateSelectEl ? dateSelectEl.value : '';
 
     const now = Date.now();
+    // 历史记录只有 startTime（新记录另有 completedAt），旧代码读的 item.time 从未存在
+    const itemTime = (item) => item.completedAt || item.startTime || 0;
     const filtered = history.filter(item => {
         if (keyword && !(item.title || '').toLowerCase().includes(keyword) && !(item.author || '').toLowerCase().includes(keyword)) return false;
         if (authorFilter && item.author !== authorFilter) return false;
-        if (dateFilter === 'today' && (now - item.time) > 86400000) return false;
-        if (dateFilter === 'week' && (now - item.time) > 7 * 86400000) return false;
-        if (dateFilter === 'month' && (now - item.time) > 30 * 86400000) return false;
+        if (dateFilter === 'today' && (now - itemTime(item)) > 86400000) return false;
+        if (dateFilter === 'week' && (now - itemTime(item)) > 7 * 86400000) return false;
+        if (dateFilter === 'month' && (now - itemTime(item)) > 30 * 86400000) return false;
         return true;
     });
 
@@ -358,7 +361,7 @@ async function loadHistory() {
             ? `<img class="history-thumb" src="${escapeHTML(item.cover)}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">` + `<div class="history-thumb-placeholder" style="display:none;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg></div>`
             : placeholderHtml;
         const authorStr = item.author ? `<span style="font-size:11px;color:var(--c-text-muted);">@${escapeHTML(item.author)}</span>` : '';
-        const timeStr = item.time ? `<span style="font-size:11px;color:var(--c-text-muted);">${new Date(item.time).toLocaleString('zh-CN', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}</span>` : '';
+        const timeStr = itemTime(item) ? `<span style="font-size:11px;color:var(--c-text-muted);">${new Date(itemTime(item)).toLocaleString('zh-CN', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}</span>` : '';
         const safePathId = registerPath(item.filePath);
         return `
       <div class="history-item">
@@ -678,6 +681,7 @@ async function downloadFavItem(idx) {
             livePhotos: item.livePhotos,
             cover: item.cover,
             title: item.title,
+            author: item.author,
             awemeId: item.awemeId,
             platform: item.platform || 'douyin',
         });
@@ -949,6 +953,7 @@ async function downloadLikedItem(idx) {
             livePhotos: item.livePhotos,
             cover: item.cover,
             title: item.title,
+            author: item.author,
             awemeId: item.awemeId,
             platform: item.platform || 'douyin',
         });
@@ -1220,6 +1225,7 @@ async function downloadMsgItem(idx) {
             livePhotos: item.livePhotos,
             cover: item.cover,
             title: item.title,
+            author: item.author,
             awemeId: item.awemeId,
             platform: item.platform || 'douyin',
         });
@@ -1494,7 +1500,7 @@ async function loadScheduleLogs() {
         }
         logPanel.innerHTML = logs.map(log => {
             const time = new Date(log.time).toLocaleString('zh-CN');
-            const modeLabel = { both: '收藏+喜欢', favorites: '仅收藏', liked: '仅喜欢' }[log.syncMode] || escapeHTML(log.syncMode);
+            const modeLabel = { both: '收藏+喜欢', favorites: '仅收藏', liked: '仅喜欢', messages: '仅私信', all: '全部' }[log.syncMode] || escapeHTML(log.syncMode);
             if (log.error) {
                 return `<div style="padding:6px 0;border-bottom:1px solid var(--c-border);">
                     <span style="color:var(--c-error);">✕</span> ${time} [${modeLabel}] ${escapeHTML(log.error)}
@@ -1503,6 +1509,7 @@ async function loadScheduleLogs() {
             const r = log.results || {};
             return `<div style="padding:6px 0;border-bottom:1px solid var(--c-border);">
                 <span style="color:var(--c-success);">✓</span> ${time} [${modeLabel}] 发现${log.totalFound || 0}条 → 下载${log.toDownload || 0}条 (成功${r.success || 0} / 失败${r.fail || 0})
+                ${log.partialError ? `<div style="color:var(--c-error);font-size:12px;">部分来源失败：${escapeHTML(log.partialError)}</div>` : ''}
             </div>`;
         }).join('');
     } catch (err) {
@@ -1693,6 +1700,7 @@ async function downloadUserItem(cardId, idx, subDir = '') {
             livePhotos: uItem.livePhotos,
             cover: uItem.cover,
             title: uItem.title,
+            author: uItem.author,
             awemeId: uItem.awemeId,
             platform: uItem.platform || 'douyin',
             subDir: subDir || '',

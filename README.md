@@ -3,8 +3,8 @@
 > 🚀 一个基于 Node.js 构建的现代化、极简、高颜值的全平台视频内容解析及下载工具。
 
 ![UI Preview](https://img.shields.io/badge/Status-Active-success)
-![Version](https://img.shields.io/badge/Version-8.6.1-blue)
-![Nodejs](https://img.shields.io/badge/Node.js-18.x-blue)
+![Version](https://img.shields.io/badge/Version-8.7.0-blue)
+![Nodejs](https://img.shields.io/badge/Node.js-20%2B-blue)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 
 ## 🌟 核心特性
@@ -35,6 +35,13 @@
 ## 🆕 相比「新增喜欢功能」之后的详细更新
 
 以下内容为基于 `feat: add douyin liked sync support` 之后的持续迭代，方便老用户快速了解最近新增了什么：
+
+### 🆕 v8.7.0 更新（2026-10-31）
+
+- **下载更可靠**：原子写入，失败不损坏已有文件；图集或实况视频缺失时不再显示完成。
+- **历史筛选恢复**：作者和日期筛选生效。
+- **删除后可重新同步**：收藏/喜欢中仍存在的作品，删除文件后下次同步会重新下载。
+- **稳定性与安全**：浏览器 profile 统一排队、定时同步按来源重试、路径与符号链接校验、依赖安全升级；运行环境要求 Node.js ≥ 20。
 
 ### 🆕 v8.6.1 更新（2026-10-29）
 
@@ -248,7 +255,7 @@
 ## 🛠 快速开始 / Quick Start
 
 ### 环境依赖
-确保你已经安装了 [Node.js](https://nodejs.org/) (推荐 v16 以上版本)。
+确保你已经安装了 [Node.js](https://nodejs.org/) **20 或更高版本**（Playwright 1.62、node-cron 4 均要求 Node ≥ 20，Node 16/18 无法正常运行）。
 
 ### 安装步骤
 
@@ -302,7 +309,7 @@ npm run build-mac
 
 <details>
 <summary><b>pkg 打包兼容性说明</b></summary>
-提示：为了完美兼容 `pkg` 对动态加载模块的封装，项目中暂时保留了当前 `axios` 版本。若后续升级，请先验证开发态、Docker 部署态与 `pkg` 打包产物的兼容性。
+⚠️ 当前 `pkg` 打包目标仍是 Node 18，而运行时依赖已要求 Node ≥ 20，打包产物**未经验证、可能无法运行**；`pkg` 本身也已停止维护。推荐使用 Node.js 或 Docker 方式部署，单文件打包需另行迁移到受维护的方案。
 </details>
 
 ---

@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const taskManager = require('../lib/task-manager');
 const fileHelper = require('../lib/file-helper');
+const favorites = require('../lib/douyin-favorites');
+const path = require('path');
 
 /**
  * GET /api/history — 获取下载历史（已完成的任务）
@@ -51,6 +53,21 @@ router.post('/history/delete', async (req, res) => {
 
     try {
         await fileHelper.safeDeleteFile(filePath);
+
+        // 删除后让下载状态真正对齐：移除指向该文件的历史记录与"已下载"ID，后续同步可重新下载。
+        // awemeId 优先取历史记录，其次从落盘名末尾的 _<作品ID> 解析（同步列表直接删的文件可能没有历史记录）
+        const target = path.resolve(filePath);
+        const ids = new Set();
+        for (const task of taskManager.getAllTasks('download')) {
+            if (task.filePath && path.resolve(task.filePath) === target) {
+                if (task.awemeId) ids.add(task.awemeId);
+                await taskManager.deleteTask('download', task.id);
+            }
+        }
+        const m = path.basename(target).match(/_(\d{15,20})(?:\.mp4)?$/);
+        if (m) ids.add(m[1]);
+        await favorites.removeDownloadedIds([...ids]);
+
         res.json({ success: true });
     } catch (err) {
         console.error(`[删除文件] 失败: ${err.message}`);

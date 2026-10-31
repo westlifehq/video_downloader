@@ -1,3 +1,31 @@
+## [v8.7.0] - 2026-10-31
+
+### Security
+- **下载路径约束**：`/api/download` 校验 `awemeId` 格式、拒绝 `.`/`..` 子目录，最终路径用 `resolveWithinRoot` 限定在下载根目录内；`buildDownloadName` 同时清除 `awemeId` 中的路径字符。
+- **文件打开/删除按真实路径校验**：拒绝符号链接及解析后落在下载根目录外的路径。
+- **依赖升级**：axios 1.21.0、express 4.22.3、follow-redirects 1.16.2、body-parser 1.20.9、proxy-addr 2.0.8、qs 6.16.2、brace-expansion 1.1.21。生产依赖审计由 9 个（1 critical / 4 high / 1 moderate / 3 low）降至 3 个 low（stealth 插件链，修复需破坏性降级，暂保留）。
+
+### Fixed
+- **原子下载**：视频、图片、实况视频统一写临时文件，校验实际字节后原子重命名；失败不再删除已有同名文件。
+- **图集完整性**：任一图片或实况视频失败、或实际字节少于 `Content-Length`，都判定下载失败，不再标记完成或记录 ID。
+- **下载历史筛选**：保存作者与完成时间，作者下拉和日期筛选恢复生效（旧记录无作者，按开始时间筛选）。
+- **登录流程**：初始化失败关闭浏览器；用户关窗、超时、连续检测失败时登录等待必定结束。
+- **排队中的停止**：已点停止的同步出队后不再启动浏览器，界面显示"已停止"。
+- 私信同步初始化失败时关闭浏览器。
+
+### Changed
+- **浏览器 profile 统一管理**：新增 `lib/profile-lock.js`。登录、退出和各类同步统一排队；退出会抢占正在运行的浏览器；解析兜底在 profile 忙时直接使用临时会话。
+- **定时同步按来源重试**：一个来源失败不再丢弃其他来源的结果，部分失败显示在日志面板。
+- **删除文件后可重新同步**：删除时同步移除历史记录和已下载 ID，**收藏/喜欢里仍存在的作品会在下次同步时重新下载**。
+- **运行环境明确为 Node.js ≥ 20**：增加 `engines`，同步 README 和 Windows 脚本；`pkg` 打包目标仍是 Node 18，产物未验证。
+- macOS 启动脚本只结束本项目旧实例，不再 `kill -9` 占用端口的其他程序。
+
+### Metadata
+- Branch: `main`
+- Scope: `lib/`, `routes/`, `public/`, `tests/review-fixes.test.js`, 启动脚本, `package.json`, `package-lock.json`, `CHANGELOG.md`, `README.md`
+
+---
+
 ## [v8.6.1] - 2026-10-29
 
 ### Fixed

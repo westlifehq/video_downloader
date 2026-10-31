@@ -1,12 +1,16 @@
 {
   "name": "video-downloader",
-  "version": "8.6.1",
+  "version": "8.7.0",
   "description": "全平台视频内容解析与下载工具",
   "main": "server.js",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "node server.js",
     "start": "node server.js",
     "test": "node --test tests/*.test.js",
+    "audit:prod": "npm audit --omit=dev",
     "build-win": "pkg . --targets node18-win-x64 --output video-downloader.exe",
     "build-mac": "pkg . --targets node18-macos-x64 --output video-downloader-mac"
   },

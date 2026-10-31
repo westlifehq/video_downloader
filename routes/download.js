@@ -7,12 +7,13 @@ const douyin = require('../lib/douyin');
 const favorites = require('../lib/douyin-favorites');
 const configHelper = require('../lib/config');
 const taskManager = require('../lib/task-manager');
+const fileHelper = require('../lib/file-helper');
 
 /**
  * POST /api/download — 开始下载视频/图集
  */
 router.post('/download', async (req, res) => {
-    const { videoUrl, title, awemeId, type, images, livePhotos, cover, subDir } = req.body;
+    const { videoUrl, title, author, awemeId, type, images, livePhotos, cover, subDir } = req.body;
     let { platform } = req.body;
     const isImage = type === 'image';
 
@@ -28,13 +29,20 @@ router.post('/download', async (req, res) => {
 
     console.log(`[下载] 收到请求: ${title}, 平台: ${platform || '未知'}, 类型: ${type}, 子文件夹: ${subDir || '无'}`);
 
+    if (awemeId !== undefined && awemeId !== null && awemeId !== '' && !/^[A-Za-z0-9_-]{1,128}$/.test(String(awemeId))) {
+        return res.status(400).json({ error: '作品 ID 格式无效' });
+    }
+
     // Express 4 不捕获 async 异常：建目录/落库失败时若不兜底，请求会一直挂起
     let fileName, savePath, taskId;
     try {
         let downloadDir = await configHelper.getEffectiveDownloadDir();
         if (subDir) {
             const safeSubDir = douyin.sanitizeFilename(subDir);
-            downloadDir = path.join(downloadDir, safeSubDir);
+            if (!safeSubDir || /^\.+$/.test(safeSubDir)) {
+                return res.status(400).json({ error: '子目录无效' });
+            }
+            downloadDir = fileHelper.resolveWithinRoot(downloadDir, safeSubDir);
         }
 
         // 确保下载目录存在
@@ -45,7 +53,7 @@ router.post('/download', async (req, res) => {
 
         // 生成文件名或目录名
         fileName = douyin.buildDownloadName({ type, title, awemeId, livePhotos });
-        savePath = path.join(downloadDir, fileName);
+        savePath = fileHelper.resolveWithinRoot(downloadDir, fileName);
 
         taskId = uuidv4();
         await taskManager.createTask('download', taskId, {
@@ -56,6 +64,7 @@ router.post('/download', async (req, res) => {
             filePath: savePath,
             fileName,
             title,
+            author: typeof author === 'string' ? author.slice(0, 100) : '',
             // 封面与 awemeId 落库，供下载历史页渲染缩略图（旧记录无此字段，前端已有占位兜底）
             cover: typeof cover === 'string' ? cover : '',
             awemeId: awemeId || '',
@@ -63,6 +72,7 @@ router.post('/download', async (req, res) => {
         });
     } catch (err) {
         console.error(`[下载] 任务创建失败: ${err.message}`);
+        if (err.message === '非法下载路径') return res.status(400).json({ error: '非法下载路径' });
         return res.status(500).json({ error: '下载任务创建失败，请检查下载目录' });
     }
 
@@ -88,7 +98,8 @@ router.post('/download', async (req, res) => {
             await taskManager.updateTask('download', taskId, {
                 status: 'done',
                 progress: 100,
-                fileSize: result.fileSize
+                fileSize: result.fileSize,
+                completedAt: Date.now()
             });
 
             // 记录已下载的 awemeId

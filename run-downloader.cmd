@@ -18,7 +18,7 @@ if exist ".\douyin-downloader.exe" (
 	where node >nul 2>nul
 	if errorlevel 1 (
 		echo.
-		echo 未检测到 Node.js，请先安装 Node.js 16+。
+		echo 未检测到 Node.js，请先安装 Node.js 20+。
 		echo 下载地址: https://nodejs.org/
 		echo.
 		pause

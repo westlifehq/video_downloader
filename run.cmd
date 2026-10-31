@@ -11,7 +11,7 @@ if exist ".\douyin-downloader.exe" (
 where node >nul 2>nul
 if errorlevel 1 (
 	echo 未检测到 Node.js。
-	echo 请先安装 Node.js 16+，然后重新双击本文件。
+	echo 请先安装 Node.js 20+，然后重新双击本文件。
 	pause
 	exit /b 1
 )

@@ -104,7 +104,7 @@ router.post('/favorites/sync', async (req, res) => {
             if (rawItems.length === 0) {
                 await taskManager.updateTask('favSync', taskId, {
                     status: 'done',
-                    phase: '收藏列表为空'
+                    phase: currentTask && currentTask.interrupted ? '已停止' : '收藏列表为空'
                 });
                 return;
             }
@@ -235,7 +235,7 @@ router.post('/liked/sync', async (req, res) => {
             if (rawItems.length === 0) {
                 await taskManager.updateTask('likedSync', taskId, {
                     status: 'done',
-                    phase: '喜欢列表为空'
+                    phase: currentTask && currentTask.interrupted ? '已停止' : '喜欢列表为空'
                 });
                 return;
             }
@@ -369,7 +369,7 @@ router.post('/messages/sync', async (req, res) => {
             if (rawItems.length === 0) {
                 await taskManager.updateTask('msgSync', taskId, {
                     status: 'done',
-                    phase: '未在私信中发现视频'
+                    phase: currentTask && currentTask.interrupted ? '已停止' : '未在私信中发现视频'
                 });
                 return;
             }
@@ -533,7 +533,7 @@ router.post('/user/sync', async (req, res) => {
             if (rawItems.length === 0) {
                 await taskManager.updateTask('userSync', taskId, {
                     status: 'done',
-                    phase: `${tabLabel}列表为空`,
+                    phase: currentTask && currentTask.interrupted ? '已停止' : `${tabLabel}列表为空`,
                     nickname
                 });
                 return;
