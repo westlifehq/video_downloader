@@ -120,7 +120,7 @@ router.post('/favorites/sync', async (req, res) => {
                     const awemeId = info.awemeId || '';
                     const fileName = douyin.buildDownloadName(info);
                     const savePath = path.join(downloadDir, fileName);
-                    const alreadyDownloaded = syncedIds.has(awemeId) || fsSync.existsSync(savePath);
+                    const alreadyDownloaded = syncedIds.has(awemeId) || (info.type !== 'image' && fsSync.existsSync(savePath));
 
                     items.push({
                         type: info.type,
@@ -251,7 +251,7 @@ router.post('/liked/sync', async (req, res) => {
                     const awemeId = info.awemeId || '';
                     const fileName = douyin.buildDownloadName(info);
                     const savePath = path.join(downloadDir, fileName);
-                    const alreadyDownloaded = likedIds.has(awemeId) || fsSync.existsSync(savePath);
+                    const alreadyDownloaded = likedIds.has(awemeId) || (info.type !== 'image' && fsSync.existsSync(savePath));
 
                     items.push({
                         type: info.type,
@@ -388,7 +388,7 @@ router.post('/messages/sync', async (req, res) => {
                     const awemeId = info.awemeId || '';
                     const fileName = douyin.buildDownloadName(info);
                     const savePath = path.join(downloadDir, fileName);
-                    const alreadyDownloaded = downloadedIds.has(awemeId) || fsSync.existsSync(savePath);
+                    const alreadyDownloaded = downloadedIds.has(awemeId) || (info.type !== 'image' && fsSync.existsSync(savePath));
 
                     items.push({
                         type: info.type,

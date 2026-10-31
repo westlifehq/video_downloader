@@ -141,6 +141,37 @@ test('scheduler keeps successful sources when another source fails', async (t) =
   scheduler.__setRetryDelayForTest(3 * 60 * 1000);
 });
 
+test('scheduler retries failed downloads and does not skip a partial image folder', async (t) => {
+  scheduler.__setRetryDelayForTest(0);
+  t.mock.method(configHelper, 'readScheduleConfig', async () => ({ syncMode: 'liked', maxCount: 5 }));
+  t.mock.method(configHelper, 'getEffectiveDownloadDir', async () => downloadRoot);
+  t.mock.method(configHelper, 'appendScheduleLog', async () => {});
+  t.mock.method(favorites, 'checkLoginStatus', async () => ({ loggedIn: true }));
+  t.mock.method(favorites, 'getSyncedData', async () => ({ ids: [] }));
+  t.mock.method(favorites, 'getLikedData', async () => ({ ids: [] }));
+  const saved = [];
+  t.mock.method(favorites, 'saveSyncedIds', async (ids) => { saved.push(...ids); });
+  t.mock.method(favorites, 'saveLikedIds', async () => {});
+  t.mock.method(favorites, 'fetchLikedVideos', async () => ([{
+    aweme_id: '7000000000000000002', desc: 'album',
+    images: [{ url_list: ['https://p3-sign.douyinpic.com/a.jpeg'] }],
+  }]));
+  // 上次失败留下的残缺目录
+  fs.mkdirSync(path.join(downloadRoot, '[图集]_album_7000000000000000002'), { recursive: true });
+  let calls = 0;
+  t.mock.method(douyin, 'downloadImages', async () => {
+    calls++;
+    if (calls < 3) throw new Error('connect ECONNREFUSED');
+    return { fileSize: 1 };
+  });
+
+  const entry = await scheduler.executeScheduledSync();
+  assert.equal(calls, 3);
+  assert.deepEqual(entry.results, { success: 1, fail: 0 });
+  assert.deepEqual(saved, ['7000000000000000002']);
+  scheduler.__setRetryDelayForTest(3 * 60 * 1000);
+});
+
 test.after(() => {
   fs.rmSync(tmpRoot, { recursive: true, force: true });
 });
