@@ -3,7 +3,7 @@
 > 🚀 一个基于 Node.js 构建的现代化、极简、高颜值的全平台视频内容解析及下载工具。
 
 ![UI Preview](https://img.shields.io/badge/Status-Active-success)
-![Version](https://img.shields.io/badge/Version-8.7.2-blue)
+![Version](https://img.shields.io/badge/Version-8.7.3-blue)
 ![Nodejs](https://img.shields.io/badge/Node.js-20%2B-blue)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 
@@ -35,6 +35,10 @@
 ## 🆕 相比「新增喜欢功能」之后的详细更新
 
 以下内容为基于 `feat: add douyin liked sync support` 之后的持续迭代，方便老用户快速了解最近新增了什么：
+
+### 🆕 v8.7.3 更新（2026-11-08）
+
+- **修复底座镜像与 playwright 版本漂移**：锁定 playwright 1.62.1 + 底座升 `v1.62.1-jammy`（amd64/arm64），修复同步功能 `Executable doesn't exist` 全挂问题。
 
 ### 🆕 v8.7.2 更新（2026-11-08）
 
