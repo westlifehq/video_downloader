@@ -1,3 +1,18 @@
+## [v8.7.1] - 2026-11-08
+
+### Added
+- **浏览器代理支持（BROWSER_PROXY）**：新增 `lib/browser-proxy.js`，所有 Playwright 启动点（抖音解析策略4 ×2、收藏/喜欢/私信/用户主页同步 ×4）统一按 `BROWSER_PROXY` 环境变量注入代理，支持 `BROWSER_PROXY_BYPASS` 直连白名单（默认 127.0.0.1,localhost）。axios 侧沿用 HTTP_PROXY/HTTPS_PROXY/NO_PROXY 标准环境变量。
+- **用途**：支持部署到海外机房（如东京 OCI ARM）时让浏览器出口走国内家宽代理，避免机房 IP 触发抖音风控；不设置 BROWSER_PROXY 时行为与之前完全一致。
+
+### Verified
+- 语法检查通过；未设置环境变量时 applyProxy 返回原对象，零行为变化。
+
+### Metadata
+- Branch: `main`
+- Scope: `lib/browser-proxy.js`(新增), `lib/douyin.js`, `lib/douyin-favorites.js`, `package.json`, `package-lock.json`, `CHANGELOG.md`, `README.md`
+
+---
+
 ## [v8.7.0] - 2026-10-31
 
 ### Security
