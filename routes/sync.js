@@ -102,9 +102,13 @@ router.post('/favorites/sync', async (req, res) => {
 
             const currentTask = taskManager.getTask('favSync', taskId);
             if (rawItems.length === 0) {
+                // 区分"用户主动停止"与"页面未加载/被风控"：后者此前会静默返回 0 条，
+                // 用户误以为账号没数据。抖音在风控或页面渲染超时时只返回骨架页。
+                const interrupted = !!(currentTask && currentTask.interrupted);
                 await taskManager.updateTask('favSync', taskId, {
-                    status: 'done',
-                    phase: currentTask && currentTask.interrupted ? '已停止' : '收藏列表为空'
+                    status: interrupted ? 'done' : 'error',
+                    error: interrupted ? undefined : '未获取到收藏数据：页面可能未加载完成或触发风控，请重试',
+                    phase: interrupted ? '已停止' : '收藏列表为空（页面未就绪）'
                 });
                 return;
             }
@@ -233,9 +237,11 @@ router.post('/liked/sync', async (req, res) => {
 
             const currentTask = taskManager.getTask('likedSync', taskId);
             if (rawItems.length === 0) {
+                const interrupted = !!(currentTask && currentTask.interrupted);
                 await taskManager.updateTask('likedSync', taskId, {
-                    status: 'done',
-                    phase: currentTask && currentTask.interrupted ? '已停止' : '喜欢列表为空'
+                    status: interrupted ? 'done' : 'error',
+                    error: interrupted ? undefined : '未获取到喜欢数据：页面可能未加载完成或触发风控，请重试',
+                    phase: interrupted ? '已停止' : '喜欢列表为空（页面未就绪）'
                 });
                 return;
             }
@@ -367,9 +373,11 @@ router.post('/messages/sync', async (req, res) => {
 
             const currentTask = taskManager.getTask('msgSync', taskId);
             if (rawItems.length === 0) {
+                const interrupted = !!(currentTask && currentTask.interrupted);
                 await taskManager.updateTask('msgSync', taskId, {
-                    status: 'done',
-                    phase: currentTask && currentTask.interrupted ? '已停止' : '未在私信中发现视频'
+                    status: interrupted ? 'done' : 'error',
+                    error: interrupted ? undefined : '未在私信中发现视频：页面可能未加载完成或触发风控，请重试',
+                    phase: interrupted ? '已停止' : '私信列表为空（页面未就绪）'
                 });
                 return;
             }
