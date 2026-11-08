@@ -3,7 +3,7 @@
 > 🚀 一个基于 Node.js 构建的现代化、极简、高颜值的全平台视频内容解析及下载工具。
 
 ![UI Preview](https://img.shields.io/badge/Status-Active-success)
-![Version](https://img.shields.io/badge/Version-8.7.4-blue)
+![Version](https://img.shields.io/badge/Version-8.7.5-blue)
 ![Nodejs](https://img.shields.io/badge/Node.js-20%2B-blue)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 
@@ -35,6 +35,10 @@
 ## 🆕 相比「新增喜欢功能」之后的详细更新
 
 以下内容为基于 `feat: add douyin liked sync support` 之后的持续迭代，方便老用户快速了解最近新增了什么：
+
+### 🆕 v8.7.5 更新（2026-11-08）
+
+- **手动同步自动重试**：收藏/喜欢（3 次、间隔 15s）、私信（2 次、间隔 20s）在抓到 0 条且非主动停止时自动重试，界面显示重试进度。
 
 ### 🆕 v8.7.4 更新（2026-11-08）
 

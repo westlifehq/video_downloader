@@ -17,6 +17,31 @@ function normalizeMaxCount(raw) {
     return Number.isInteger(n) && n > 0 ? Math.min(n, 500) : 50;
 }
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * 带重试的抓取：抖音页面偶发只渲染骨架（风控/渲染超时）导致 0 条，
+ * 手动同步此前会直接失败。策略：最多 attempts 次、间隔 delayMs，
+ * 用户主动停止或已拿到数据则立即结束。
+ */
+async function fetchWithRetry({ taskType, taskId, attempts, delayMs, doFetch }) {
+    let last = [];
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+        last = await doFetch(attempt);
+        if (Array.isArray(last) && last.length > 0) return last;
+        const t = taskManager.getTask(taskType, taskId);
+        if (!t || t.interrupted) break;
+        if (attempt < attempts) {
+            console.log(`[${taskType}] 未取到数据（第 ${attempt}/${attempts} 次），${Math.round(delayMs / 1000)} 秒后重试`);
+            await taskManager.updateTask(taskType, taskId, {
+                phase: `未取到数据（第 ${attempt}/${attempts} 次），${Math.round(delayMs / 1000)} 秒后重试...`,
+            });
+            await sleep(delayMs);
+        }
+    }
+    return Array.isArray(last) ? last : [];
+}
+
 // ═══════════════════════════════════════════
 // 收藏同步 API
 // ═══════════════════════════════════════════
@@ -93,11 +118,14 @@ router.post('/favorites/sync', async (req, res) => {
 
     (async () => {
         try {
-            const rawItems = await favorites.fetchFavorites(maxCount, async (collected, max, current) => {
-                await taskManager.updateTask('favSync', taskId, { collected, maxCount: max, current });
-            }, () => {
-                const t = taskManager.getTask('favSync', taskId);
-                return t ? t.interrupted : false;
+            const rawItems = await fetchWithRetry({
+                taskType: 'favSync', taskId, attempts: 3, delayMs: 15000,
+                doFetch: () => favorites.fetchFavorites(maxCount, async (collected, max, current) => {
+                    await taskManager.updateTask('favSync', taskId, { collected, maxCount: max, current });
+                }, () => {
+                    const t = taskManager.getTask('favSync', taskId);
+                    return t ? t.interrupted : false;
+                }),
             });
 
             const currentTask = taskManager.getTask('favSync', taskId);
@@ -228,11 +256,14 @@ router.post('/liked/sync', async (req, res) => {
 
     (async () => {
         try {
-            const rawItems = await favorites.fetchLikedVideos(maxCount, async (collected, max, current) => {
-                await taskManager.updateTask('likedSync', taskId, { collected, maxCount: max, current });
-            }, () => {
-                const t = taskManager.getTask('likedSync', taskId);
-                return t ? t.interrupted : false;
+            const rawItems = await fetchWithRetry({
+                taskType: 'likedSync', taskId, attempts: 3, delayMs: 15000,
+                doFetch: () => favorites.fetchLikedVideos(maxCount, async (collected, max, current) => {
+                    await taskManager.updateTask('likedSync', taskId, { collected, maxCount: max, current });
+                }, () => {
+                    const t = taskManager.getTask('likedSync', taskId);
+                    return t ? t.interrupted : false;
+                }),
             });
 
             const currentTask = taskManager.getTask('likedSync', taskId);
@@ -361,14 +392,17 @@ router.post('/messages/sync', async (req, res) => {
 
     (async () => {
         try {
-            const rawItems = await favorites.fetchMessageVideos(maxCount, async (progress) => {
-                await taskManager.updateTask('msgSync', taskId, {
-                    phase: progress.phase,
-                    collected: progress.collected
-                });
-            }, () => {
-                const t = taskManager.getTask('msgSync', taskId);
-                return t ? t.interrupted : false;
+            const rawItems = await fetchWithRetry({
+                taskType: 'msgSync', taskId, attempts: 2, delayMs: 20000,
+                doFetch: () => favorites.fetchMessageVideos(maxCount, async (progress) => {
+                    await taskManager.updateTask('msgSync', taskId, {
+                        phase: progress.phase,
+                        collected: progress.collected
+                    });
+                }, () => {
+                    const t = taskManager.getTask('msgSync', taskId);
+                    return t ? t.interrupted : false;
+                }),
             });
 
             const currentTask = taskManager.getTask('msgSync', taskId);
