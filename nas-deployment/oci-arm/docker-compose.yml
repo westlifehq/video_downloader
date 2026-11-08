@@ -1,0 +1,35 @@
+services:
+  downloader:
+    build:
+      context: ..
+      dockerfile: nas-deployment/Dockerfile
+    container_name: video-downloader
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - /home/ubuntu/data/dy:/downloads
+      - /home/ubuntu/data/vd/user_data:/app/user_data
+      - /home/ubuntu/data/vd/douyin_session.json:/app/douyin_session.json
+      - /home/ubuntu/data/vd/liked_ids.json:/app/liked_ids.json
+      - /home/ubuntu/data/vd/synced_ids.json:/app/synced_ids.json
+      - /home/ubuntu/data/vd/schedule_config.json:/app/schedule_config.json
+      - /home/ubuntu/data/vd/schedule_log.json:/app/schedule_log.json
+    environment:
+      - NODE_ENV=production
+      - DOWNLOAD_DIR=/downloads
+      - DISABLE_REMOTE_FILE_ACTIONS=true
+      - TZ=Asia/Shanghai
+      # 出口走家庭宽带（Tailscale 到家宽代理），避免东京机房 IP 触发抖音风控
+      - HTTP_PROXY=${VD_PROXY:?set VD_PROXY in .env}
+      - HTTPS_PROXY=${VD_PROXY:?set VD_PROXY in .env}
+      # 视频/图片 CDN 走东京直连（249MB/s），页面与 API 仍走家宽代理
+      - NO_PROXY=127.0.0.1,localhost,100.69.79.97,${VD_PROXY_HOST:?set VD_PROXY_HOST in .env},172.17.0.0/16,.douyinvod.com,.snssdk.com,.douyinpic.com,.douyincdn.com,.bytecdn.cn,.bytevcloudcdn.com,.pstatp.com,.amemv.com,.toutiaovod.com,.xhscdn.com
+      - BROWSER_PROXY=${VD_PROXY:?set VD_PROXY in .env}
+      - BROWSER_PROXY_BYPASS=127.0.0.1,localhost
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp
